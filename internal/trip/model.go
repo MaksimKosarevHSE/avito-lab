@@ -46,4 +46,17 @@ type CreateInput struct {
 	EndLatitude    float64
 	EndLongitude   float64
 	Price          int64
+	IdempotencyKey *uuid.UUID
+}
+
+type CreateResult struct {
+	Trip     Trip
+	Replayed bool
+}
+
+type IdempotencyRecord struct {
+	Key                uuid.UUID
+	FingerprintVersion int16
+	RequestFingerprint []byte
+	TripID             uuid.UUID
 }

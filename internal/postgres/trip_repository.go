@@ -15,6 +15,7 @@ import (
 )
 
 const activeTripPerDriverConstraint = "trips_one_active_per_driver_idx"
+const tripCreateIdempotencyTable = "trip_create_idempotency"
 
 var tripColumns = []string{
 	"id",
@@ -192,6 +193,98 @@ func (r *TripRepository) AddStatusHistory(ctx context.Context, history trip.Stat
 	}
 
 	return nil
+}
+
+func (r *TripRepository) ClaimIdempotencyKey(
+	ctx context.Context,
+	record trip.IdempotencyRecord,
+	ttl time.Duration,
+) (bool, error) {
+	query, args, err := r.builder.
+		Insert(tripCreateIdempotencyTable).
+		Columns(
+			"idempotency_key",
+			"fingerprint_version",
+			"request_fingerprint",
+			"trip_id",
+			"created_at",
+			"expires_at",
+		).
+		Values(
+			record.Key,
+			record.FingerprintVersion,
+			record.RequestFingerprint,
+			record.TripID,
+			sq.Expr("statement_timestamp()"),
+			sq.Expr(
+				"statement_timestamp() + (? * interval '1 second')",
+				ttl.Seconds(),
+			),
+		).
+		Suffix(`ON CONFLICT (idempotency_key) DO UPDATE SET
+fingerprint_version = EXCLUDED.fingerprint_version,
+request_fingerprint = EXCLUDED.request_fingerprint,
+trip_id = EXCLUDED.trip_id,
+created_at = EXCLUDED.created_at,
+expires_at = EXCLUDED.expires_at
+WHERE trip_create_idempotency.expires_at <= statement_timestamp()
+RETURNING trip_id`).
+		ToSql()
+	if err != nil {
+		return false, fmt.Errorf("build claim idempotency key query: %w", err)
+	}
+
+	queryCtx, cancel := r.pool.queryContext(ctx)
+	defer cancel()
+
+	var tripID uuid.UUID
+	err = executorFromContext(ctx, r.pool).QueryRow(queryCtx, query, args...).Scan(&tripID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("claim idempotency key: %w", err)
+	}
+	if tripID != record.TripID {
+		return false, errors.New("claimed idempotency key returned an unexpected trip ID")
+	}
+
+	return true, nil
+}
+
+func (r *TripRepository) GetIdempotencyKey(
+	ctx context.Context,
+	key uuid.UUID,
+) (trip.IdempotencyRecord, error) {
+	query, args, err := r.builder.
+		Select(
+			"idempotency_key",
+			"fingerprint_version",
+			"request_fingerprint",
+			"trip_id",
+		).
+		From(tripCreateIdempotencyTable).
+		Where(sq.Eq{"idempotency_key": key}).
+		ToSql()
+	if err != nil {
+		return trip.IdempotencyRecord{}, fmt.Errorf("build get idempotency key query: %w", err)
+	}
+
+	queryCtx, cancel := r.pool.queryContext(ctx)
+	defer cancel()
+
+	var record trip.IdempotencyRecord
+	err = executorFromContext(ctx, r.pool).QueryRow(queryCtx, query, args...).Scan(
+		&record.Key,
+		&record.FingerprintVersion,
+		&record.RequestFingerprint,
+		&record.TripID,
+	)
+	if err != nil {
+		return trip.IdempotencyRecord{}, fmt.Errorf("get idempotency key: %w", err)
+	}
+
+	return record, nil
 }
 
 func (r *TripRepository) getStatus(

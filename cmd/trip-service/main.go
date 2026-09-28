@@ -65,7 +65,7 @@ func run() error {
 
 	repository := postgres.NewTripRepository(database)
 	txManager := postgres.NewTxManager(database)
-	tripService := trip.NewService(txManager, repository)
+	tripService := trip.NewService(txManager, repository, cfg.IdempotencyTTL)
 	httpHandler := httpapi.NewHandler(tripService, database, cfg.Database.QueryTimeout)
 
 	router := chi.NewRouter()

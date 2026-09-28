@@ -1,13 +1,19 @@
 package trip
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+const idempotencyFingerprintVersion int16 = 1
 
 type TxManager interface {
 	Do(ctx context.Context, fn func(ctx context.Context) error) error
@@ -18,23 +24,31 @@ type Repository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (Trip, error)
 	Finish(ctx context.Context, id uuid.UUID, finishedAt time.Time) (Trip, error)
 	AddStatusHistory(ctx context.Context, history StatusHistory) error
+	ClaimIdempotencyKey(
+		ctx context.Context,
+		record IdempotencyRecord,
+		ttl time.Duration,
+	) (bool, error)
+	GetIdempotencyKey(ctx context.Context, key uuid.UUID) (IdempotencyRecord, error)
 }
 
 type Service struct {
-	txManager  TxManager
-	repository Repository
+	txManager      TxManager
+	repository     Repository
+	idempotencyTTL time.Duration
 }
 
-func NewService(txManager TxManager, repository Repository) *Service {
+func NewService(txManager TxManager, repository Repository, idempotencyTTL time.Duration) *Service {
 	return &Service{
-		txManager:  txManager,
-		repository: repository,
+		txManager:      txManager,
+		repository:     repository,
+		idempotencyTTL: idempotencyTTL,
 	}
 }
 
-func (s *Service) Create(ctx context.Context, input CreateInput) (Trip, error) {
+func (s *Service) Create(ctx context.Context, input CreateInput) (CreateResult, error) {
 	if err := validateCreateInput(input); err != nil {
-		return Trip{}, err
+		return CreateResult{}, err
 	}
 
 	now := time.Now().UTC()
@@ -53,8 +67,53 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Trip, error) {
 		UpdatedAt:      now,
 	}
 
+	var requestFingerprint []byte
+	if input.IdempotencyKey != nil {
+		requestFingerprint = createInputFingerprint(input)
+	}
+
+	var result CreateResult
 	reason := "trip created"
 	err := s.txManager.Do(ctx, func(ctx context.Context) error {
+		if input.IdempotencyKey != nil {
+			claimed, err := s.repository.ClaimIdempotencyKey(ctx, IdempotencyRecord{
+				Key:                *input.IdempotencyKey,
+				FingerprintVersion: idempotencyFingerprintVersion,
+				RequestFingerprint: requestFingerprint,
+				TripID:             created.ID,
+			}, s.idempotencyTTL)
+			if err != nil {
+				return fmt.Errorf("claim idempotency key: %w", err)
+			}
+
+			if !claimed {
+				record, err := s.repository.GetIdempotencyKey(ctx, *input.IdempotencyKey)
+				if err != nil {
+					return fmt.Errorf("get idempotency key: %w", err)
+				}
+				if record.FingerprintVersion != idempotencyFingerprintVersion {
+					return fmt.Errorf(
+						"unsupported idempotency fingerprint version %d",
+						record.FingerprintVersion,
+					)
+				}
+				if !bytes.Equal(record.RequestFingerprint, requestFingerprint) {
+					return ErrIdempotencyConflict
+				}
+
+				replayed, err := s.repository.GetByID(ctx, record.TripID)
+				if errors.Is(err, ErrTripNotFound) {
+					return errors.New("idempotency record references missing trip")
+				}
+				if err != nil {
+					return fmt.Errorf("get idempotent trip: %w", err)
+				}
+
+				result = CreateResult{Trip: replayed, Replayed: true}
+				return nil
+			}
+		}
+
 		if err := s.repository.Create(ctx, created); err != nil {
 			return fmt.Errorf("create trip: %w", err)
 		}
@@ -68,13 +127,42 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (Trip, error) {
 			return fmt.Errorf("add initial trip status history: %w", err)
 		}
 
+		result = CreateResult{Trip: created}
 		return nil
 	})
 	if err != nil {
-		return Trip{}, fmt.Errorf("create trip transaction: %w", err)
+		return CreateResult{}, fmt.Errorf("create trip transaction: %w", err)
 	}
 
-	return created, nil
+	return result, nil
+}
+
+func createInputFingerprint(input CreateInput) []byte {
+	data := make([]byte, 72)
+	offset := 0
+
+	copy(data[offset:], input.UserID[:])
+	offset += len(input.UserID)
+	copy(data[offset:], input.DriverID[:])
+	offset += len(input.DriverID)
+
+	for _, coordinate := range []float64{
+		input.StartLatitude,
+		input.StartLongitude,
+		input.EndLatitude,
+		input.EndLongitude,
+	} {
+		var bits uint64
+		if coordinate != 0 {
+			bits = math.Float64bits(coordinate)
+		}
+		binary.BigEndian.PutUint64(data[offset:], bits)
+		offset += 8
+	}
+
+	binary.BigEndian.PutUint64(data[offset:], uint64(input.Price))
+	sum := sha256.Sum256(data)
+	return sum[:]
 }
 
 func validateCreateInput(input CreateInput) error {

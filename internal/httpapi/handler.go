@@ -41,7 +41,7 @@ func NewHandler(trips *trip.Service, pinger Pinger, queryTimeout time.Duration) 
 func (h *Handler) CreateTrip(
 	w http.ResponseWriter,
 	r *http.Request,
-	_ api.CreateTripParams,
+	params api.CreateTripParams,
 ) {
 	if !hasJSONContentType(r) {
 		writeInvalidRequest(w, r)
@@ -54,7 +54,7 @@ func (h *Handler) CreateTrip(
 		return
 	}
 
-	created, err := h.trips.Create(r.Context(), trip.CreateInput{
+	result, err := h.trips.Create(r.Context(), trip.CreateInput{
 		UserID:         body.UserId,
 		DriverID:       body.DriverId,
 		StartLatitude:  body.StartPoint.Latitude,
@@ -62,14 +62,20 @@ func (h *Handler) CreateTrip(
 		EndLatitude:    body.EndPoint.Latitude,
 		EndLongitude:   body.EndPoint.Longitude,
 		Price:          body.Price,
+		IdempotencyKey: params.IdempotencyKey,
 	})
 	if err != nil {
 		writeServiceError(w, r, err)
 		return
 	}
 
-	w.Header().Set("Location", "/api/v1/trips/"+created.ID.String())
-	writeJSONResponse(w, http.StatusCreated, toAPITrip(created))
+	statusCode := http.StatusCreated
+	if result.Replayed {
+		statusCode = http.StatusOK
+	} else {
+		w.Header().Set("Location", "/api/v1/trips/"+result.Trip.ID.String())
+	}
+	writeJSONResponse(w, statusCode, toAPITrip(result.Trip))
 }
 
 func (h *Handler) GetTrip(w http.ResponseWriter, r *http.Request, tripID api.TripId) {
@@ -266,6 +272,16 @@ func writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
 			"Driver busy",
 			"Driver already has an active trip",
 			"driver_busy",
+		)
+	case errors.Is(err, trip.ErrIdempotencyConflict):
+		writeProblem(
+			w,
+			r,
+			http.StatusConflict,
+			"https://tripgo.example/problems/idempotency-conflict",
+			"Idempotency conflict",
+			"Idempotency-Key was already used with a different request body",
+			"idempotency_conflict",
 		)
 	default:
 		writeInternalError(w, r, err)
