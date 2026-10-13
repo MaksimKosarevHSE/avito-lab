@@ -12,7 +12,7 @@ export IDEMPOTENCY_TTL
 export DATABASE_URL DATABASE_MAX_CONNS DATABASE_MIN_CONNS
 export DATABASE_MAX_CONN_LIFETIME DATABASE_CONNECT_TIMEOUT DATABASE_QUERY_TIMEOUT
 
-.PHONY: generate migrate migrate-down migrate-status run
+.PHONY: generate migrate migrate-down migrate-status run test
 
 generate:
 	go tool oapi-codegen \
@@ -31,3 +31,6 @@ migrate-status:
 
 run:
 	go run ./cmd/trip-service
+
+test:
+	go test -race ./...

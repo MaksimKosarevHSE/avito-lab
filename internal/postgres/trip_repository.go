@@ -16,6 +16,20 @@ import (
 
 const activeTripPerDriverConstraint = "trips_one_active_per_driver_idx"
 const tripCreateIdempotencyTable = "trip_create_idempotency"
+const idempotencyCleanupBatchSize = 100
+
+const deleteExpiredIdempotencyKeysQuery = `
+WITH expired AS (
+    SELECT idempotency_key
+    FROM trip_create_idempotency
+    WHERE expires_at <= statement_timestamp()
+    ORDER BY expires_at, idempotency_key
+    LIMIT $1
+    FOR UPDATE SKIP LOCKED
+)
+DELETE FROM trip_create_idempotency AS records
+USING expired
+WHERE records.idempotency_key = expired.idempotency_key`
 
 var tripColumns = []string{
 	"id",
@@ -195,6 +209,21 @@ func (r *TripRepository) AddStatusHistory(ctx context.Context, history trip.Stat
 	return nil
 }
 
+func (r *TripRepository) DeleteExpiredIdempotencyKeys(ctx context.Context) error {
+	queryCtx, cancel := r.pool.queryContext(ctx)
+	defer cancel()
+
+	if _, err := executorFromContext(ctx, r.pool).Exec(
+		queryCtx,
+		deleteExpiredIdempotencyKeysQuery,
+		idempotencyCleanupBatchSize,
+	); err != nil {
+		return fmt.Errorf("delete expired idempotency keys: %w", err)
+	}
+
+	return nil
+}
+
 func (r *TripRepository) ClaimIdempotencyKey(
 	ctx context.Context,
 	record trip.IdempotencyRecord,
@@ -330,6 +359,14 @@ func scanTrip(row pgx.Row) (trip.Trip, error) {
 	)
 	if err != nil {
 		return trip.Trip{}, err
+	}
+
+	result.StartedAt = result.StartedAt.UTC()
+	result.CreatedAt = result.CreatedAt.UTC()
+	result.UpdatedAt = result.UpdatedAt.UTC()
+	if result.FinishedAt != nil {
+		finishedAt := result.FinishedAt.UTC()
+		result.FinishedAt = &finishedAt
 	}
 
 	result.Status = trip.Status(status)

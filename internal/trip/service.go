@@ -24,6 +24,7 @@ type Repository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (Trip, error)
 	Finish(ctx context.Context, id uuid.UUID, finishedAt time.Time) (Trip, error)
 	AddStatusHistory(ctx context.Context, history StatusHistory) error
+	DeleteExpiredIdempotencyKeys(ctx context.Context) error
 	ClaimIdempotencyKey(
 		ctx context.Context,
 		record IdempotencyRecord,
@@ -50,8 +51,13 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (CreateResult, 
 	if err := validateCreateInput(input); err != nil {
 		return CreateResult{}, err
 	}
+	if input.IdempotencyKey != nil {
+		if err := s.repository.DeleteExpiredIdempotencyKeys(ctx); err != nil {
+			return CreateResult{}, fmt.Errorf("cleanup idempotency keys: %w", err)
+		}
+	}
 
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Microsecond)
 	created := Trip{
 		ID:             uuid.New(),
 		UserID:         input.UserID,
@@ -200,7 +206,7 @@ func (s *Service) Get(ctx context.Context, id uuid.UUID) (Trip, error) {
 }
 
 func (s *Service) Finish(ctx context.Context, id uuid.UUID) (Trip, error) {
-	now := time.Now().UTC()
+	now := time.Now().UTC().Truncate(time.Microsecond)
 	var finished Trip
 
 	reason := "trip finished"

@@ -44,13 +44,13 @@ func (h *Handler) CreateTrip(
 	params api.CreateTripParams,
 ) {
 	if !hasJSONContentType(r) {
-		writeInvalidRequest(w, r)
+		writeInvalidRequest(w, r, "Content-Type must be application/json")
 		return
 	}
 
 	body, err := decodeCreateTripBody(w, r)
 	if err != nil {
-		writeInvalidRequest(w, r)
+		writeInvalidRequest(w, r, err.Error())
 		return
 	}
 
@@ -98,8 +98,8 @@ func (h *Handler) FinishTrip(w http.ResponseWriter, r *http.Request, tripID api.
 	writeJSONResponse(w, http.StatusOK, toAPITrip(result))
 }
 
-func (h *Handler) HandleParameterError(w http.ResponseWriter, r *http.Request, _ error) {
-	writeInvalidRequest(w, r)
+func (h *Handler) HandleParameterError(w http.ResponseWriter, r *http.Request, err error) {
+	writeInvalidRequest(w, r, err.Error())
 }
 
 func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
@@ -242,7 +242,7 @@ func writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
 
 	switch {
 	case errors.Is(err, trip.ErrInvalidTrip):
-		writeInvalidRequest(w, r)
+		writeInvalidRequest(w, r, err.Error())
 	case errors.Is(err, trip.ErrTripNotFound):
 		writeProblem(
 			w,
@@ -307,14 +307,14 @@ func writeInternalError(w http.ResponseWriter, r *http.Request, err error) {
 	)
 }
 
-func writeInvalidRequest(w http.ResponseWriter, r *http.Request) {
+func writeInvalidRequest(w http.ResponseWriter, r *http.Request, detail string) {
 	writeProblem(
 		w,
 		r,
 		http.StatusBadRequest,
 		"https://tripgo.example/problems/invalid-request",
 		"Invalid request",
-		"Request validation failed",
+		detail,
 		"invalid_request",
 	)
 }
