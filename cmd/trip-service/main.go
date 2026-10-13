@@ -13,6 +13,7 @@ import (
 	"github.com/MaksimKosarevHSE/avito-lab/api"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/config"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/httpapi"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/idempotency"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/postgres"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/trip"
 	"github.com/go-chi/chi/v5"
@@ -67,6 +68,21 @@ func run() error {
 	txManager := postgres.NewTxManager(database)
 	tripService := trip.NewService(txManager, repository, cfg.IdempotencyTTL)
 	httpHandler := httpapi.NewHandler(tripService, database, cfg.Database.QueryTimeout)
+	cleanupJob := idempotency.NewCleanupJob(
+		repository,
+		cfg.IdempotencyCleanupInterval,
+		logger,
+	)
+	cleanupCtx, cancelCleanup := context.WithCancel(appCtx)
+	cleanupDone := make(chan struct{})
+	go func() {
+		defer close(cleanupDone)
+		cleanupJob.Run(cleanupCtx)
+	}()
+	defer func() {
+		cancelCleanup()
+		<-cleanupDone
+	}()
 
 	router := chi.NewRouter()
 	server := &http.Server{
@@ -119,6 +135,9 @@ func run() error {
 			shutdownErr = fmt.Errorf("serve HTTP during shutdown: %w", serveErr)
 		}
 	}
+
+	cancelCleanup()
+	<-cleanupDone
 
 	databaseCloseStarted = true
 	if err := closeDatabase(shutdownCtx, database); err != nil {

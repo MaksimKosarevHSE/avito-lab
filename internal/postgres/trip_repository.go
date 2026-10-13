@@ -16,7 +16,6 @@ import (
 
 const activeTripPerDriverConstraint = "trips_one_active_per_driver_idx"
 const tripCreateIdempotencyTable = "trip_create_idempotency"
-const idempotencyCleanupBatchSize = 100
 
 const deleteExpiredIdempotencyKeysQuery = `
 WITH expired AS (
@@ -209,19 +208,27 @@ func (r *TripRepository) AddStatusHistory(ctx context.Context, history trip.Stat
 	return nil
 }
 
-func (r *TripRepository) DeleteExpiredIdempotencyKeys(ctx context.Context) error {
+func (r *TripRepository) DeleteExpiredIdempotencyKeys(
+	ctx context.Context,
+	limit int,
+) (int64, error) {
+	if limit <= 0 {
+		return 0, errors.New("idempotency cleanup limit must be positive")
+	}
+
 	queryCtx, cancel := r.pool.queryContext(ctx)
 	defer cancel()
 
-	if _, err := executorFromContext(ctx, r.pool).Exec(
+	commandTag, err := executorFromContext(ctx, r.pool).Exec(
 		queryCtx,
 		deleteExpiredIdempotencyKeysQuery,
-		idempotencyCleanupBatchSize,
-	); err != nil {
-		return fmt.Errorf("delete expired idempotency keys: %w", err)
+		limit,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("delete expired idempotency keys: %w", err)
 	}
 
-	return nil
+	return commandTag.RowsAffected(), nil
 }
 
 func (r *TripRepository) ClaimIdempotencyKey(

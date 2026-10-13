@@ -24,7 +24,6 @@ type Repository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (Trip, error)
 	Finish(ctx context.Context, id uuid.UUID, finishedAt time.Time) (Trip, error)
 	AddStatusHistory(ctx context.Context, history StatusHistory) error
-	DeleteExpiredIdempotencyKeys(ctx context.Context) error
 	ClaimIdempotencyKey(
 		ctx context.Context,
 		record IdempotencyRecord,
@@ -50,11 +49,6 @@ func NewService(txManager TxManager, repository Repository, idempotencyTTL time.
 func (s *Service) Create(ctx context.Context, input CreateInput) (CreateResult, error) {
 	if err := validateCreateInput(input); err != nil {
 		return CreateResult{}, err
-	}
-	if input.IdempotencyKey != nil {
-		if err := s.repository.DeleteExpiredIdempotencyKeys(ctx); err != nil {
-			return CreateResult{}, fmt.Errorf("cleanup idempotency keys: %w", err)
-		}
 	}
 
 	now := time.Now().UTC().Truncate(time.Microsecond)

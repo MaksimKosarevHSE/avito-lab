@@ -18,6 +18,7 @@ const (
 	logLevelEnv              = "LOG_LEVEL"
 	shutdownTimeoutEnv       = "SHUTDOWN_TIMEOUT"
 	idempotencyTTLEnv        = "IDEMPOTENCY_TTL"
+	idempotencyCleanupEnv    = "IDEMPOTENCY_CLEANUP_INTERVAL"
 	databaseURLEnv           = "DATABASE_URL"
 	databaseMaxConnsEnv      = "DATABASE_MAX_CONNS"
 	databaseMinConnsEnv      = "DATABASE_MIN_CONNS"
@@ -27,11 +28,12 @@ const (
 )
 
 type Config struct {
-	HTTP            HTTPConfig
-	Database        DatabaseConfig
-	LogLevel        slog.Level
-	ShutdownTimeout time.Duration
-	IdempotencyTTL  time.Duration
+	HTTP                       HTTPConfig
+	Database                   DatabaseConfig
+	LogLevel                   slog.Level
+	ShutdownTimeout            time.Duration
+	IdempotencyTTL             time.Duration
+	IdempotencyCleanupInterval time.Duration
 }
 
 type HTTPConfig struct {
@@ -96,6 +98,10 @@ func Load() (Config, error) {
 	}
 	if cfg.IdempotencyTTL < time.Microsecond {
 		return Config{}, fmt.Errorf("%s must be at least %s", idempotencyTTLEnv, time.Microsecond)
+	}
+	cfg.IdempotencyCleanupInterval, err = requiredPositiveDuration(idempotencyCleanupEnv)
+	if err != nil {
+		return Config{}, err
 	}
 
 	cfg.Database.URL, err = requiredString(databaseURLEnv)
