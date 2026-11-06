@@ -4,5 +4,9 @@
 
 # Сборка
 bin/
+coverage.out
 
+# IDE и ОС
+.idea/
+.vscode/
 .DS_Store
