@@ -16,6 +16,7 @@ export DATABASE_MAX_CONN_LIFETIME DATABASE_CONNECT_TIMEOUT DATABASE_QUERY_TIMEOU
 .PHONY: generate migrate migrate-down migrate-status run test
 
 generate:
+	go generate ./internal/service/trip/... ./internal/http/trip/...
 	go tool oapi-codegen \
 		-config ./api/oapi-codegen.yaml \
 		-o ./api/api.gen.go \
