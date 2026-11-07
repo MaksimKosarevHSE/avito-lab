@@ -10,13 +10,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// The pool is part of the key so transactions opened for different databases
-// cannot be mixed when they share the same context.
 type transactionContextKey struct {
 	pool *pgxpool.Pool
 }
 
-// Manager owns transaction boundaries and the transaction stored in context.
 type Manager struct {
 	pool           *pgxpool.Pool
 	controlTimeout time.Duration
@@ -36,8 +33,6 @@ func New(pool *pgxpool.Pool, controlTimeout time.Duration) (*Manager, error) {
 	}, nil
 }
 
-// Do executes fn inside a transaction. A nested call joins the current
-// transaction; it does not create a savepoint.
 func (m *Manager) Do(
 	ctx context.Context,
 	fn func(ctx context.Context) error,
@@ -90,8 +85,6 @@ func (m *Manager) Do(
 	return nil
 }
 
-// Transaction returns the transaction associated with ctx for this manager's
-// pool. It is intended for the PostgreSQL gateway, not for business code.
 func (m *Manager) Transaction(ctx context.Context) (pgx.Tx, bool) {
 	tx, ok := ctx.Value(transactionContextKey{pool: m.pool}).(pgx.Tx)
 	return tx, ok

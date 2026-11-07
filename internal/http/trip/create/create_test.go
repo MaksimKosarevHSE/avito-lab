@@ -121,3 +121,76 @@ func TestHandler_CreateTrip_Success(t *testing.T) {
 	assert.Equal(t, createdTrip.UserID, response.UserId)
 	assert.Equal(t, api.TripStatus(trip.StatusActive), response.Status)
 }
+
+func TestHandler_CreateTripDriverBusy(t *testing.T) {
+	f := NewFixture(t)
+
+	requestBody := api.CreateTripJSONRequestBody{
+		UserId:   f.UserID,
+		DriverId: f.DriverID,
+		Price:    200,
+		StartPoint: api.Coordinates{
+			Latitude:  24.5,
+			Longitude: 24.6,
+		},
+		EndPoint: api.Coordinates{
+			Latitude:  27.5,
+			Longitude: 27.6,
+		},
+	}
+
+	payload, err := json.Marshal(requestBody)
+	require.NoError(t, err)
+
+	f.Service.EXPECT().
+		Create(gomock.Any(), gomock.Any()).
+		Return(create.CreateResult{}, trip.ErrDriverBusy)
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/trip", bytes.NewReader(payload))
+	request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+
+	f.Handler.CreateTrip(recorder, request, api.CreateTripParams{})
+	var response api.Problem
+	require.NoError(t, json.NewDecoder(recorder.Body).Decode(&response))
+
+	require.Equal(t, http.StatusConflict, recorder.Code)
+	assert.Equal(t, "driver_busy", response.Code)
+	assert.Equal(t, int32(http.StatusConflict), response.Status)
+}
+func TestHandler_CreateTrip_InvalidBodyReturnsBadRequest(t *testing.T) {
+	f := NewFixture(t)
+
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/api/v1/trips",
+		bytes.NewBufferString(`{"user_id":`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+
+	recorder := httptest.NewRecorder()
+
+	f.Handler.CreateTrip(
+		recorder,
+		request,
+		api.CreateTripParams{},
+	)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	assert.Equal(
+		t,
+		"application/problem+json",
+		recorder.Header().Get("Content-Type"),
+	)
+
+	var problem api.Problem
+	require.NoError(
+		t,
+		json.NewDecoder(recorder.Body).Decode(&problem),
+	)
+
+	assert.Equal(t, int32(http.StatusBadRequest), problem.Status)
+	assert.Equal(t, "invalid_request", problem.Code)
+
+	require.NotNil(t, problem.Detail)
+}

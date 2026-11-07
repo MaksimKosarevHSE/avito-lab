@@ -210,38 +210,63 @@ func TestNewTrip_CreatesActiveTrip(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func TestFinish_SuccessfullyFinish(t *testing.T) {
-	tmStart := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	tmEnd := tmStart.Add(time.Hour)
+func TestFinish(t *testing.T) {
+	startedAt := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	finishedAt := startedAt.Add(time.Hour)
 
-	testTrip := &trip.Trip{
-		Status:    trip.StatusActive,
-		StartedAt: tmStart,
-		UpdatedAt: tmStart,
+	tests := []struct {
+		name     string
+		initial  trip.Trip
+		finishAt time.Time
+		want     trip.Trip
+		wantErr  error
+	}{
+		{
+			name: "finish active trip",
+			initial: trip.Trip{
+				Status:    trip.StatusActive,
+				StartedAt: startedAt,
+				UpdatedAt: startedAt,
+			},
+			finishAt: finishedAt,
+			want: trip.Trip{
+				Status:     trip.StatusCompleted,
+				StartedAt:  startedAt,
+				FinishedAt: &finishedAt,
+				UpdatedAt:  finishedAt,
+			},
+		},
+		{
+			name: "do not finish completed trip",
+			initial: trip.Trip{
+				Status:     trip.StatusCompleted,
+				StartedAt:  startedAt,
+				FinishedAt: &finishedAt,
+				UpdatedAt:  finishedAt,
+			},
+			finishAt: finishedAt.Add(time.Minute),
+			want: trip.Trip{
+				Status:     trip.StatusCompleted,
+				StartedAt:  startedAt,
+				FinishedAt: &finishedAt,
+				UpdatedAt:  finishedAt,
+			},
+			wantErr: trip.ErrTripCompleted,
+		},
 	}
 
-	err := testTrip.Finish(tmEnd)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.initial
 
-	require.NoError(t, err)
-	assert.Equal(t, trip.StatusCompleted, testTrip.Status)
-	assert.Equal(t, tmStart, testTrip.StartedAt)
-	require.NotNil(t, testTrip.FinishedAt)
-	assert.Equal(t, tmEnd, *testTrip.FinishedAt)
-	assert.Equal(t, tmEnd, testTrip.UpdatedAt)
-}
+			err := got.Finish(tt.finishAt)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
 
-func TestFinish_TripAlreadyCompleted(t *testing.T) {
-	stTime := time.Now()
-	fTime := stTime.Add(time.Hour)
-
-	testTrip := &trip.Trip{
-		Status:     trip.StatusCompleted,
-		StartedAt:  stTime,
-		UpdatedAt:  fTime,
-		FinishedAt: &fTime,
+			assert.Equal(t, tt.want, got)
+		})
 	}
-	beforeFinish := *testTrip
-	err := testTrip.Finish(fTime.Add(time.Minute))
-	assert.ErrorIs(t, err, trip.ErrTripCompleted)
-	assert.Equal(t, beforeFinish, *testTrip)
 }

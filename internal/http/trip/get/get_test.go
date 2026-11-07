@@ -3,6 +3,7 @@ package get_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -120,4 +121,28 @@ func TestHandler_GetTrip_NotFound(t *testing.T) {
 	assert.Equal(t, "Trip not found", problem.Title)
 	require.NotNil(t, problem.Detail)
 	assert.Equal(t, "Trip was not found", *problem.Detail)
+}
+
+func TestHadler_DoNotShowInternalAndRepositoryErrorsDetails(t *testing.T) {
+	f := NewFixture(t)
+	internalError := errors.New("INTERNAL ERROR TEXT")
+
+	f.Service.EXPECT().
+		Get(gomock.Any(), gomock.Any()).
+		Return(trip.Trip{}, internalError)
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/trips/"+f.TripID.String(), nil)
+	recorder := httptest.NewRecorder()
+	f.Handler.GetTrip(recorder, request, f.TripID)
+
+	body := recorder.Body.Bytes()
+	var problem api.Problem
+	require.NoError(t, json.Unmarshal(body, &problem))
+
+	assert.Equal(t, int32(http.StatusInternalServerError), problem.Status)
+	require.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.Equal(t, "internal_error", problem.Code)
+	require.NotContains(t, string(body), internalError.Error())
+	require.NotNil(t, problem.Detail)
+	assert.Equal(t, "Internal server error", *problem.Detail)
 }

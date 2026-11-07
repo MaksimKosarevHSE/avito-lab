@@ -4,6 +4,7 @@ package trip_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -77,21 +78,55 @@ func (s *RepositorySuite) TestUpdateTrip() {
 	assert.Equal(s.T(), expected, got)
 }
 
-func (s *RepositorySuite) TestInsertsInTwoTablesInOneTransactionAreRollbacks() {
+func (s *RepositorySuite) TestInsertsInTwoTablesInOneTransactionAreRolledBack() {
+	const countRowsQuery = `SELECT
+		(SELECT count(*) FROM trips WHERE id = $1),
+		(SELECT count(*) FROM trip_status_history WHERE trip_id = $1)`
+
 	t := s.T()
+	rollbackErr := errors.New("transaction rollback")
+	reason := "trip created"
 
 	err := s.postgres.TxManager.Do(t.Context(), func(ctx context.Context) error {
 		err := s.repository.Create(ctx, *s.tripFixture)
 		require.NoError(t, err)
 
-		_, err = s.repository.GetByID(ctx, s.tripFixture.ID)
+		err = s.repository.AddStatusHistory(ctx, domaintrip.StatusHistory{
+			TripID:    s.tripFixture.ID,
+			ToStatus:  domaintrip.StatusActive,
+			Reason:    &reason,
+			ChangedAt: s.tripFixture.CreatedAt,
+		})
 		require.NoError(t, err)
-		return s.repository.AddStatusHistory(ctx, domaintrip.StatusHistory{})
-	})
-	require.Error(t, err)
 
-	_, err = s.repository.GetByID(t.Context(), s.tripFixture.ID)
-	require.ErrorIs(t, err, domaintrip.ErrTripNotFound)
+		tx, ok := s.postgres.TxManager.Transaction(ctx)
+		require.True(t, ok)
+
+		var tripCount int64
+		var historyCount int64
+		err = tx.QueryRow(
+			ctx,
+			countRowsQuery,
+			s.tripFixture.ID,
+		).Scan(&tripCount, &historyCount)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, tripCount)
+		require.EqualValues(t, 1, historyCount)
+
+		return rollbackErr
+	})
+	require.ErrorIs(t, err, rollbackErr)
+
+	var tripCount int64
+	var historyCount int64
+	err = s.postgres.Pool.QueryRow(
+		t.Context(),
+		countRowsQuery,
+		s.tripFixture.ID,
+	).Scan(&tripCount, &historyCount)
+	require.NoError(t, err)
+	assert.Zero(t, tripCount)
+	assert.Zero(t, historyCount)
 }
 
 func (s *RepositorySuite) TestCreateReturnsDriverBusy() {

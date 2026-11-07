@@ -18,7 +18,6 @@ type pinger interface {
 	Ping(ctx context.Context) error
 }
 
-// Handler composes action-specific handlers into the generated HTTP contract.
 type Handler struct {
 	create       *createhttp.Handler
 	get          *gethttp.Handler

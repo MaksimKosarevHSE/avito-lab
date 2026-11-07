@@ -83,14 +83,49 @@ func TestHandler_FinishTrip_Success(t *testing.T) {
 	var response api.Trip
 	err := json.NewDecoder(recorder.Body).Decode(&response)
 	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, recorder.Code)
 
 	assert.Equal(t, completedTrip.ID, response.Id)
 	assert.Equal(t, completedTrip.UserID, response.UserId)
 	assert.Equal(t, completedTrip.DriverID, response.DriverId)
 	assert.Equal(t, api.Completed, response.Status)
 	assert.Equal(t, completedTrip.Price, response.Price)
-
 	require.NotNil(t, response.FinishedAt)
 	assert.True(t, finishedAt.Equal(*response.FinishedAt))
 
+}
+
+func TestHandler_TryFinishAlreadyFinishedTrip(t *testing.T) {
+	f := NewFixture(t)
+	now := time.Now()
+	finishedTrip := trip.Trip{
+		ID:             f.TripID,
+		UserID:         uuid.New(),
+		DriverID:       uuid.New(),
+		StartLatitude:  24.5,
+		StartLongitude: 24.6,
+		EndLatitude:    27.5,
+		EndLongitude:   27.6,
+		Price:          200,
+		Status:         trip.StatusActive,
+		StartedAt:      now,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	err := finishedTrip.Finish(time.Now())
+	require.NoError(t, err)
+
+	f.Service.EXPECT().
+		Finish(gomock.Any(), gomock.Any()).
+		Return(trip.Trip{}, trip.ErrTripCompleted)
+
+	request := httptest.NewRequest(http.MethodPost, "/api/trips/"+f.TripID.String()+"/finish", nil)
+	recorder := httptest.NewRecorder()
+	f.Handler.FinishTrip(recorder, request, f.TripID)
+	var response api.Problem
+	require.NoError(t, json.NewDecoder(recorder.Body).Decode(&response))
+
+	require.Equal(t, http.StatusConflict, recorder.Code)
+	assert.Equal(t, "trip_completed", response.Code)
+	assert.Equal(t, int32(http.StatusConflict), response.Status)
 }
