@@ -13,7 +13,7 @@ export IDEMPOTENCY_TTL IDEMPOTENCY_CLEANUP_INTERVAL
 export DATABASE_URL DATABASE_MAX_CONNS DATABASE_MIN_CONNS
 export DATABASE_MAX_CONN_LIFETIME DATABASE_CONNECT_TIMEOUT DATABASE_QUERY_TIMEOUT
 
-.PHONY: generate migrate migrate-down migrate-status run test
+.PHONY: generate migrate migrate-down migrate-status run test test-integration
 
 generate:
 	go generate ./internal/service/trip/... ./internal/http/trip/...
@@ -36,3 +36,6 @@ run:
 
 test:
 	go test -race ./...
+
+test-integration:
+	go test -race -count=1 -tags=integration -p=2 -timeout=5m ./...
