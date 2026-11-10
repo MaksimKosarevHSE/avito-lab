@@ -3,19 +3,26 @@ package create
 import (
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/MaksimKosarevHSE/avito-lab/api"
-	common_http_util "github.com/MaksimKosarevHSE/avito-lab/internal/http/common"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/http/common"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/http/domainerror"
 )
 
 type Handler struct {
-	service tripCreator
+	service   tripCreator
+	responses *common.ResponseWriter
+	problems  *domainerror.Writer
 }
 
-func New(service tripCreator) *Handler {
-	return &Handler{service: service}
+func New(service tripCreator, logger *slog.Logger) *Handler {
+	return &Handler{
+		service:   service,
+		responses: common.NewResponseWriter(logger),
+		problems:  domainerror.NewWriter(logger),
+	}
 }
 
 func (h *Handler) CreateTrip(
@@ -25,13 +32,13 @@ func (h *Handler) CreateTrip(
 ) {
 	body, err := decodeCreateTripBody(r)
 	if err != nil {
-		domainerror.WriteInvalidRequest(w, r, "request body contains invalid JSON")
+		h.problems.WriteInvalidRequest(w, r, "request body contains invalid JSON")
 		return
 	}
 
 	result, err := h.service.Create(r.Context(), toCreateInput(body, params))
 	if err != nil {
-		domainerror.Write(w, r, err)
+		h.problems.Write(w, r, err)
 		return
 	}
 
@@ -42,7 +49,7 @@ func (h *Handler) CreateTrip(
 		w.Header().Set("Location", "/api/v1/trips/"+result.Trip.ID.String())
 	}
 
-	common_http_util.WriteJSONResponse(w, r, statusCode, toAPITrip(result.Trip))
+	h.responses.WriteJSON(w, r, statusCode, toAPITrip(result.Trip))
 }
 
 func decodeCreateTripBody(

@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/finish"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gomock "go.uber.org/mock/gomock"
+
+	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/finish"
 )
 
 type fixture struct {
@@ -95,7 +96,7 @@ func TestService_DoNotFinishAlreadyFinished(t *testing.T) {
 	now := time.Now()
 
 	finishedTrip := f.Trip
-	finishedTrip.Finish(now)
+	require.NoError(t, finishedTrip.Finish(now))
 
 	f.TxManager.EXPECT().
 		Do(gomock.Any(), gomock.Any()).

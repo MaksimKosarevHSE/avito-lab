@@ -5,10 +5,11 @@ package triptest
 import (
 	"testing"
 
-	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	tripcreate "github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/create"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
+	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
+	tripcreate "github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/create"
 )
 
 type Steps struct {

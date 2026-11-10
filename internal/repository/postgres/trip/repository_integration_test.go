@@ -8,13 +8,14 @@ import (
 	"testing"
 	"time"
 
-	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/repository/postgres/trip"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/testkit"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/repository/postgres/trip"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/testkit"
 )
 
 type RepositorySuite struct {
@@ -141,6 +142,29 @@ func (s *RepositorySuite) TestCreateReturnsDriverBusy() {
 	err = s.repository.Create(t.Context(), trip2)
 	require.ErrorIs(t, err, domaintrip.ErrDriverBusy)
 }
+
+func (s *RepositorySuite) TestCountActive() {
+	t := s.T()
+
+	count, err := s.repository.CountActive(t.Context())
+	require.NoError(t, err)
+	assert.Zero(t, count)
+
+	require.NoError(t, s.repository.Create(t.Context(), *s.tripFixture))
+
+	count, err = s.repository.CountActive(t.Context())
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, count)
+
+	completed := *s.tripFixture
+	require.NoError(t, completed.Finish(time.Now().UTC().Truncate(time.Microsecond)))
+	require.NoError(t, s.repository.Update(t.Context(), completed))
+
+	count, err = s.repository.CountActive(t.Context())
+	require.NoError(t, err)
+	assert.Zero(t, count)
+}
+
 func TestRepositorySuite(t *testing.T) {
 	suite.Run(t, new(RepositorySuite))
 }

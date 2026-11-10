@@ -1,8 +1,9 @@
 package trip
 
 import (
-	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 	"github.com/jackc/pgx/v5"
+
+	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 )
 
 func scanTrip(row pgx.Row) (domaintrip.Trip, error) {

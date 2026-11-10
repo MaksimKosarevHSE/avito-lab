@@ -3,18 +3,20 @@ package finish_test
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/MaksimKosarevHSE/avito-lab/api"
-	trip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/finish"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gomock "go.uber.org/mock/gomock"
+
+	"github.com/MaksimKosarevHSE/avito-lab/api"
+	trip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/finish"
 )
 
 type fixture struct {
@@ -30,7 +32,7 @@ func NewFixture(t *testing.T) *fixture {
 
 	ctrl := gomock.NewController(t)
 	service := NewMocktripFinisher(ctrl)
-	handler := finish.New(service)
+	handler := finish.New(service, slog.New(slog.DiscardHandler))
 
 	return &fixture{
 		Ctx:     context.Background(),
@@ -92,7 +94,6 @@ func TestHandler_FinishTrip_Success(t *testing.T) {
 	assert.Equal(t, completedTrip.Price, response.Price)
 	require.NotNil(t, response.FinishedAt)
 	assert.True(t, finishedAt.Equal(*response.FinishedAt))
-
 }
 
 func TestHandler_TryFinishAlreadyFinishedTrip(t *testing.T) {

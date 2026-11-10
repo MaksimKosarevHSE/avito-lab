@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 
-	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
 )
 
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (domaintrip.Trip, error) {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -15,6 +16,7 @@ type PoolConfig struct {
 	MinConns        int32
 	MaxConnLifetime time.Duration
 	ConnectTimeout  time.Duration
+	Tracer          pgx.QueryTracer
 }
 
 func Open(ctx context.Context, cfg PoolConfig) (*pgxpool.Pool, error) {
@@ -31,6 +33,7 @@ func Open(ctx context.Context, cfg PoolConfig) (*pgxpool.Pool, error) {
 	pgxConfig.MinConns = cfg.MinConns
 	pgxConfig.MaxConnLifetime = cfg.MaxConnLifetime
 	pgxConfig.ConnConfig.ConnectTimeout = cfg.ConnectTimeout
+	pgxConfig.ConnConfig.Tracer = cfg.Tracer
 
 	pgxPool, err := pgxpool.NewWithConfig(ctx, pgxConfig)
 	if err != nil {

@@ -12,8 +12,11 @@ export HTTP_READ_TIMEOUT HTTP_READ_HEADER_TIMEOUT HTTP_WRITE_TIMEOUT HTTP_IDLE_T
 export IDEMPOTENCY_TTL IDEMPOTENCY_CLEANUP_INTERVAL
 export DATABASE_URL DATABASE_MAX_CONNS DATABASE_MIN_CONNS
 export DATABASE_MAX_CONN_LIFETIME DATABASE_CONNECT_TIMEOUT DATABASE_QUERY_TIMEOUT
+export OTEL_SERVICE_NAME OTEL_EXPORTER_OTLP_ENDPOINT
+export OTEL_EXPORTER_OTLP_PROTOCOL OTEL_RESOURCE_ATTRIBUTES
+export OTEL_TRACES_SAMPLER OTEL_METRIC_EXPORT_INTERVAL
 
-.PHONY: generate migrate migrate-down migrate-status run test test-integration
+.PHONY: generate migrate migrate-down migrate-status run lint test test-integration
 
 generate:
 	go generate ./internal/service/trip/... ./internal/http/trip/...
@@ -34,8 +37,11 @@ migrate-status:
 run:
 	go run ./cmd/trip-service
 
+lint:
+	go tool golangci-lint run ./...
+
 test:
-	go test -race ./...
+	go test -race -count=2 -cover ./...
 
 test-integration:
 	go test -race -count=1 -tags=integration -p=2 -timeout=5m ./...

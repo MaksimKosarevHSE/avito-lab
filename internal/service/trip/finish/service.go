@@ -3,22 +3,44 @@ package finish
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
-	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 	"github.com/google/uuid"
+
+	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 )
 
 type Service struct {
 	tripRepository TripRepository
 	txManager      TxManager
+	logger         *slog.Logger
+	metrics        TripMetrics
 }
 
-func NewService(txManager TxManager, tripRepository TripRepository) *Service {
-	return &Service{
+type Option func(*Service)
+
+func WithObservability(logger *slog.Logger, metrics TripMetrics) Option {
+	return func(service *Service) {
+		service.logger = logger
+		service.metrics = metrics
+	}
+}
+
+func NewService(
+	txManager TxManager,
+	tripRepository TripRepository,
+	options ...Option,
+) *Service {
+	service := &Service{
 		txManager:      txManager,
 		tripRepository: tripRepository,
 	}
+	for _, option := range options {
+		option(service)
+	}
+
+	return service
 }
 
 func (s *Service) Finish(ctx context.Context, id uuid.UUID) (trip.Trip, error) {
@@ -56,6 +78,12 @@ func (s *Service) Finish(ctx context.Context, id uuid.UUID) (trip.Trip, error) {
 	})
 	if err != nil {
 		return trip.Trip{}, fmt.Errorf("finish trip transaction: %w", err)
+	}
+	if s.metrics != nil {
+		s.metrics.TripCompleted(ctx)
+	}
+	if s.logger != nil {
+		s.logger.InfoContext(ctx, "trip completed", "trip_id", finished.ID)
 	}
 
 	return finished, nil

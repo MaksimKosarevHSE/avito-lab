@@ -6,10 +6,11 @@ import (
 	"net/http"
 	"testing"
 
-	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/http/domainerror"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/http/domainerror"
 )
 
 func TestProblemMapping(t *testing.T) {
@@ -83,7 +84,7 @@ func TestProblemMapping(t *testing.T) {
 			status, problem := domainerror.Problem(tt.err)
 
 			assert.Equal(t, tt.wantStatus, status)
-			assert.Equal(t, int32(tt.wantStatus), problem.Status)
+			assert.EqualValues(t, tt.wantStatus, problem.Status)
 			assert.Equal(t, tt.wantCode, problem.Code)
 			assert.Equal(t, tt.wantType, problem.Type)
 			assert.Equal(t, tt.wantTitle, problem.Title)

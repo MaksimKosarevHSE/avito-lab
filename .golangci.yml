@@ -1,0 +1,121 @@
+version: "2"
+
+run:
+  concurrency: 8
+  timeout: 5m
+  build-tags:
+    - integration
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  default: none
+  enable:
+    - depguard
+    - errcheck
+    - forbidigo
+    - gochecknoinits
+    - gocritic
+    - gocyclo
+    - goconst
+    - gosec
+    - govet
+    - ineffassign
+    - makezero
+    - prealloc
+    - revive
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+    - whitespace
+
+  settings:
+    depguard:
+      rules:
+        domain:
+          files:
+            - "**/internal/domain/**"
+          deny:
+            - pkg: net/http
+              desc: domain must not depend on HTTP
+            - pkg: github.com/go-chi/chi
+              desc: domain must not depend on the router
+            - pkg: github.com/jackc/pgx
+              desc: domain must not depend on PostgreSQL
+            - pkg: github.com/Masterminds/squirrel
+              desc: domain must not build SQL
+            - pkg: go.opentelemetry.io/otel
+              desc: domain must not depend on telemetry
+        service:
+          files:
+            - "**/internal/service/**"
+          deny:
+            - pkg: net/http
+              desc: service must not depend on HTTP
+            - pkg: github.com/go-chi/chi
+              desc: service must not depend on the router
+            - pkg: github.com/jackc/pgx
+              desc: service must use consumer-side interfaces
+            - pkg: github.com/Masterminds/squirrel
+              desc: service must not build SQL
+        http:
+          files:
+            - "**/internal/http/**"
+          deny:
+            - pkg: github.com/MaksimKosarevHSE/avito-lab/internal/infra
+              desc: HTTP must not depend on infrastructure
+            - pkg: github.com/MaksimKosarevHSE/avito-lab/internal/repository
+              desc: HTTP must not depend on repositories
+
+    forbidigo:
+      forbid:
+        - pattern: ^[A-Za-z0-9]{1,}_.*\.
+
+    revive:
+      rules:
+        - name: var-naming
+          disabled: true
+
+    unparam:
+      check-exported: true
+
+    unused:
+      field-writes-are-uses: false
+
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+      - api/
+      - gen/
+
+formatters:
+  enable:
+    - gofumpt
+    - gci
+
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - localmodule
+    gofumpt:
+      extra-rules: true
+
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

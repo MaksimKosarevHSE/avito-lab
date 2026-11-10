@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func (r *Repository) Create(ctx context.Context, value domaintrip.Trip) error {

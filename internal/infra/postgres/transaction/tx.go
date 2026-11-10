@@ -10,9 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type transactionContextKey struct {
-	pool *pgxpool.Pool
-}
+type transactionContextKey *pgxpool.Pool
 
 type Manager struct {
 	pool           *pgxpool.Pool
@@ -56,7 +54,7 @@ func (m *Manager) Do(
 
 	txCtx := context.WithValue(
 		ctx,
-		transactionContextKey{pool: m.pool},
+		transactionContextKey(m.pool),
 		tx,
 	)
 	committed := false
@@ -86,7 +84,7 @@ func (m *Manager) Do(
 }
 
 func (m *Manager) Transaction(ctx context.Context) (pgx.Tx, bool) {
-	tx, ok := ctx.Value(transactionContextKey{pool: m.pool}).(pgx.Tx)
+	tx, ok := ctx.Value(transactionContextKey(m.pool)).(pgx.Tx)
 	return tx, ok
 }
 

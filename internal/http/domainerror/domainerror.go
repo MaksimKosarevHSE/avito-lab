@@ -15,6 +15,18 @@ const (
 	invalidRequestDetail = "Request does not match the API contract"
 )
 
+type Writer struct {
+	logger *slog.Logger
+}
+
+func NewWriter(logger *slog.Logger) *Writer {
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+
+	return &Writer{logger: logger}
+}
+
 func Problem(err error) (int, api.Problem) {
 	var joinedError interface {
 		Unwrap() []error
@@ -79,31 +91,44 @@ func InvalidRequest(detail string) (int, api.Problem) {
 	)
 }
 
-func Write(w http.ResponseWriter, r *http.Request, err error) {
+func (writer *Writer) Write(w http.ResponseWriter, r *http.Request, err error) {
 	statusCode, problem := Problem(err)
 	if statusCode == http.StatusInternalServerError {
-		slog.ErrorContext(
+		writer.logger.ErrorContext(
 			r.Context(),
 			"HTTP request failed",
 			"method", r.Method,
-			"path", r.URL.Path,
 			"error", err,
 		)
 	}
 
-	write(w, r, statusCode, problem)
+	writer.write(w, r, statusCode, problem)
 }
 
-func WriteInvalidRequest(w http.ResponseWriter, r *http.Request, detail string) {
+func (writer *Writer) WriteInvalidRequest(
+	w http.ResponseWriter,
+	r *http.Request,
+	detail string,
+) {
 	statusCode, problem := InvalidRequest(detail)
-	write(w, r, statusCode, problem)
+	writer.write(w, r, statusCode, problem)
 }
 
-func write(w http.ResponseWriter, r *http.Request, statusCode int, problem api.Problem) {
+func (writer *Writer) WriteInternal(w http.ResponseWriter, r *http.Request) {
+	statusCode, problem := internalError()
+	writer.write(w, r, statusCode, problem)
+}
+
+func (writer *Writer) write(
+	w http.ResponseWriter,
+	r *http.Request,
+	statusCode int,
+	problem api.Problem,
+) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(statusCode)
 	if err := json.NewEncoder(w).Encode(problem); err != nil {
-		slog.ErrorContext(r.Context(), "encode HTTP problem response", "error", err)
+		writer.logger.ErrorContext(r.Context(), "encode HTTP problem response", "error", err)
 	}
 }
 
@@ -118,16 +143,16 @@ func internalError() (int, api.Problem) {
 }
 
 func newProblem(
-	statusCode int,
+	statusCode int32,
 	problemType string,
 	title string,
 	detail string,
 	code string,
 ) (int, api.Problem) {
-	return statusCode, api.Problem{
+	return int(statusCode), api.Problem{
 		Type:   problemBaseURL + problemType,
 		Title:  title,
-		Status: int32(statusCode),
+		Status: statusCode,
 		Detail: &detail,
 		Code:   code,
 	}

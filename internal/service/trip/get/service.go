@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 	"github.com/google/uuid"
+
+	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 )
 
 type Service struct {

@@ -122,3 +122,39 @@ func (mr *MockTxManagerMockRecorder) Do(ctx, fn any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Do", reflect.TypeOf((*MockTxManager)(nil).Do), ctx, fn)
 }
+
+// MockTripMetrics is a mock of TripMetrics interface.
+type MockTripMetrics struct {
+	ctrl     *gomock.Controller
+	recorder *MockTripMetricsMockRecorder
+	isgomock struct{}
+}
+
+// MockTripMetricsMockRecorder is the mock recorder for MockTripMetrics.
+type MockTripMetricsMockRecorder struct {
+	mock *MockTripMetrics
+}
+
+// NewMockTripMetrics creates a new mock instance.
+func NewMockTripMetrics(ctrl *gomock.Controller) *MockTripMetrics {
+	mock := &MockTripMetrics{ctrl: ctrl}
+	mock.recorder = &MockTripMetricsMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockTripMetrics) EXPECT() *MockTripMetricsMockRecorder {
+	return m.recorder
+}
+
+// TripCompleted mocks base method.
+func (m *MockTripMetrics) TripCompleted(ctx context.Context) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "TripCompleted", ctx)
+}
+
+// TripCompleted indicates an expected call of TripCompleted.
+func (mr *MockTripMetricsMockRecorder) TripCompleted(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TripCompleted", reflect.TypeOf((*MockTripMetrics)(nil).TripCompleted), ctx)
+}

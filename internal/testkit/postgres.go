@@ -10,15 +10,16 @@ import (
 	"testing"
 	"time"
 
-	postgresinfra "github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres/transaction"
-	migrationsfs "github.com/MaksimKosarevHSE/avito-lab/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
+
+	postgresinfra "github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres/transaction"
+	migrationsfs "github.com/MaksimKosarevHSE/avito-lab/migrations"
 )
 
 const (

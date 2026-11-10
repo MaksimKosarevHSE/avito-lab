@@ -4,18 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/MaksimKosarevHSE/avito-lab/api"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	httpget "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/get"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+
+	"github.com/MaksimKosarevHSE/avito-lab/api"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
+	httpget "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/get"
 )
 
 type fixture struct {
@@ -31,7 +33,7 @@ func NewFixture(t *testing.T) *fixture {
 
 	ctrl := gomock.NewController(t)
 	service := NewMocktripGetter(ctrl)
-	handler := httpget.New(service)
+	handler := httpget.New(service, slog.New(slog.DiscardHandler))
 
 	return &fixture{
 		Ctx:     context.Background(),

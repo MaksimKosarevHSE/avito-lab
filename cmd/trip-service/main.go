@@ -12,11 +12,15 @@ import (
 
 	"github.com/MaksimKosarevHSE/avito-lab/internal/config"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/container"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry"
 )
 
+var version = "dev"
+
 func main() {
+	logger := telemetry.NewLogger(os.Stdout, slog.LevelInfo, "trip-service")
 	if err := run(); err != nil {
-		slog.Error("service stopped", "error", err)
+		logger.Error("service stopped", "error", err)
 		os.Exit(1)
 	}
 }
@@ -34,7 +38,7 @@ func run() error {
 	)
 	defer stopSignals()
 
-	cont, err := container.New(appCtx, cfg)
+	cont, err := container.New(appCtx, cfg, version)
 	if err != nil {
 		return fmt.Errorf("create container: %w", err)
 	}
@@ -45,6 +49,7 @@ func run() error {
 		defer close(serveDone)
 		serveErr = cont.HTTPServer.ListenAndServe()
 	}()
+	cont.Logger.Info("service started", "version", version)
 	cont.Logger.Info("HTTP server is starting", "address", cfg.HTTP.Addr)
 
 	cleanupContext, cancelCleanup := context.WithCancel(appCtx)
@@ -52,10 +57,6 @@ func run() error {
 	go func() {
 		defer close(cleanupDone)
 		cont.CleanupJob.Run(cleanupContext)
-	}()
-	defer func() {
-		cancelCleanup()
-		<-cleanupDone
 	}()
 
 	var shutdownErr error
@@ -66,13 +67,12 @@ func run() error {
 		cont.Logger.Info("shutdown signal received")
 	}
 
-	shutdownCtx, cancelShutdown := context.WithTimeout(
+	httpShutdownCtx, cancelHTTPShutdown := context.WithTimeout(
 		context.Background(),
 		cfg.ShutdownTimeout,
 	)
-	defer cancelShutdown()
 
-	if err := cont.HTTPServer.Shutdown(shutdownCtx); err != nil {
+	if err := cont.HTTPServer.Shutdown(httpShutdownCtx); err != nil {
 		shutdownErr = errors.Join(shutdownErr, fmt.Errorf("graceful HTTP shutdown: %w", err))
 		if closeErr := cont.HTTPServer.Close(); closeErr != nil {
 			shutdownErr = errors.Join(
@@ -81,18 +81,36 @@ func run() error {
 			)
 		}
 	}
+	cancelHTTPShutdown()
 
 	cancelCleanup()
-	<-cleanupDone
+	cleanupShutdownCtx, cancelCleanupShutdown := context.WithTimeout(
+		context.Background(),
+		cfg.ShutdownTimeout,
+	)
+	select {
+	case <-cleanupDone:
+	case <-cleanupShutdownCtx.Done():
+		shutdownErr = errors.Join(
+			shutdownErr,
+			fmt.Errorf("stop idempotency cleanup: %w", cleanupShutdownCtx.Err()),
+		)
+	}
+	cancelCleanupShutdown()
 
 	<-serveDone
 	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
 		shutdownErr = errors.Join(shutdownErr, fmt.Errorf("serve HTTP: %w", serveErr))
 	}
 
-	if err := cont.Close(shutdownCtx); err != nil {
+	resourceShutdownCtx, cancelResourceShutdown := context.WithTimeout(
+		context.Background(),
+		cfg.ShutdownTimeout,
+	)
+	if err := cont.Close(resourceShutdownCtx); err != nil {
 		shutdownErr = errors.Join(shutdownErr, err)
 	}
+	cancelResourceShutdown()
 
 	if shutdownErr != nil {
 		return fmt.Errorf("service shutdown: %w", shutdownErr)

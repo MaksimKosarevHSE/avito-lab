@@ -5,8 +5,9 @@ package get
 import (
 	"context"
 
-	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 	"github.com/google/uuid"
+
+	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 )
 
 type TripRepository interface {

@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"time"
 
-	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
 )
 
 const deleteExpiredIdempotencyKeysQuery = `

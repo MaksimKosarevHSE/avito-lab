@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"time"
 
@@ -21,14 +22,35 @@ type Service struct {
 	tripRepository TripRepository
 	txManager      TxManager
 	idempotencyTTL time.Duration
+	logger         *slog.Logger
+	metrics        TripMetrics
 }
 
-func NewService(txManager TxManager, tripRepository TripRepository, idempotencyTTL time.Duration) *Service {
-	return &Service{
+type Option func(*Service)
+
+func WithObservability(logger *slog.Logger, metrics TripMetrics) Option {
+	return func(service *Service) {
+		service.logger = logger
+		service.metrics = metrics
+	}
+}
+
+func NewService(
+	txManager TxManager,
+	tripRepository TripRepository,
+	idempotencyTTL time.Duration,
+	options ...Option,
+) *Service {
+	service := &Service{
 		txManager:      txManager,
 		tripRepository: tripRepository,
 		idempotencyTTL: idempotencyTTL,
 	}
+	for _, option := range options {
+		option(service)
+	}
+
+	return service
 }
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (CreateResult, error) {
@@ -45,7 +67,6 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (CreateResult, 
 		input.Price,
 		now,
 	)
-
 	if err != nil {
 		return CreateResult{}, err
 	}
@@ -117,6 +138,14 @@ func (s *Service) Create(ctx context.Context, input CreateInput) (CreateResult, 
 	if err != nil {
 		return CreateResult{}, fmt.Errorf("create trip transaction: %w", err)
 	}
+	if !result.Replayed {
+		if s.metrics != nil {
+			s.metrics.TripCreated(ctx)
+		}
+		if s.logger != nil {
+			s.logger.InfoContext(ctx, "trip created", "trip_id", result.Trip.ID)
+		}
+	}
 
 	return result, nil
 }
@@ -160,7 +189,11 @@ func createInputFingerprint(input CreateInput) []byte {
 		offset += 8
 	}
 
-	binary.BigEndian.PutUint64(data[offset:], uint64(input.Price))
+	var price uint64
+	if input.Price > 0 {
+		price = uint64(input.Price)
+	}
+	binary.BigEndian.PutUint64(data[offset:], price)
 	sum := sha256.Sum256(data)
 	return sum[:]
 }

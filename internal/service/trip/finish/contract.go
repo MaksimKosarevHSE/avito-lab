@@ -5,8 +5,9 @@ package finish
 import (
 	"context"
 
-	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 	"github.com/google/uuid"
+
+	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 )
 
 type TripRepository interface {
@@ -17,4 +18,8 @@ type TripRepository interface {
 
 type TxManager interface {
 	Do(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+type TripMetrics interface {
+	TripCompleted(ctx context.Context)
 }

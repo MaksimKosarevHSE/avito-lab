@@ -6,13 +6,14 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/MaksimKosarevHSE/avito-lab/api"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
+
+	"github.com/MaksimKosarevHSE/avito-lab/api"
 )
 
-func WriteValidationError(w http.ResponseWriter, r *http.Request, err error) {
-	WriteInvalidRequest(w, r, validationDetail(err))
+func (writer *Writer) WriteValidationError(w http.ResponseWriter, r *http.Request, err error) {
+	writer.WriteInvalidRequest(w, r, validationDetail(err))
 }
 
 func validationDetail(err error) string {

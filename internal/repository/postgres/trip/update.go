@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	sq "github.com/Masterminds/squirrel"
+
 	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
-	sq "github.com/Masterminds/squirrel"
 )
 
 func (r *Repository) Update(ctx context.Context, value domaintrip.Trip) error {

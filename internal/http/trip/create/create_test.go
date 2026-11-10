@@ -4,19 +4,21 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/MaksimKosarevHSE/avito-lab/api"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	httpcreate "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/create"
-	create "github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/create"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gomock "go.uber.org/mock/gomock"
+
+	"github.com/MaksimKosarevHSE/avito-lab/api"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
+	httpcreate "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/create"
+	create "github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/create"
 )
 
 type fixture struct {
@@ -34,7 +36,7 @@ func NewFixture(t *testing.T) *fixture {
 
 	ctrl := gomock.NewController(t)
 	service := NewMocktripCreator(ctrl)
-	handler := httpcreate.New(service)
+	handler := httpcreate.New(service, slog.New(slog.DiscardHandler))
 
 	return &fixture{
 		Ctx:      context.Background(),
@@ -158,6 +160,7 @@ func TestHandler_CreateTripDriverBusy(t *testing.T) {
 	assert.Equal(t, "driver_busy", response.Code)
 	assert.Equal(t, int32(http.StatusConflict), response.Status)
 }
+
 func TestHandler_CreateTrip_InvalidBodyReturnsBadRequest(t *testing.T) {
 	f := NewFixture(t)
 
