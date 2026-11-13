@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -15,15 +16,10 @@ type PoolConfig struct {
 	MinConns        int32
 	MaxConnLifetime time.Duration
 	ConnectTimeout  time.Duration
-	QueryTimeout    time.Duration
+	Tracer          pgx.QueryTracer
 }
 
-type Pool struct {
-	pool         *pgxpool.Pool
-	queryTimeout time.Duration
-}
-
-func Open(ctx context.Context, cfg PoolConfig) (*Pool, error) {
+func Open(ctx context.Context, cfg PoolConfig) (*pgxpool.Pool, error) {
 	if err := validatePoolConfig(cfg); err != nil {
 		return nil, err
 	}
@@ -37,15 +33,11 @@ func Open(ctx context.Context, cfg PoolConfig) (*Pool, error) {
 	pgxConfig.MinConns = cfg.MinConns
 	pgxConfig.MaxConnLifetime = cfg.MaxConnLifetime
 	pgxConfig.ConnConfig.ConnectTimeout = cfg.ConnectTimeout
+	pgxConfig.ConnConfig.Tracer = cfg.Tracer
 
 	pgxPool, err := pgxpool.NewWithConfig(ctx, pgxConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create PostgreSQL pool: %w", err)
-	}
-
-	pool := &Pool{
-		pool:         pgxPool,
-		queryTimeout: cfg.QueryTimeout,
 	}
 
 	pingCtx, cancelPing := context.WithTimeout(ctx, cfg.ConnectTimeout)
@@ -55,7 +47,23 @@ func Open(ctx context.Context, cfg PoolConfig) (*Pool, error) {
 		return nil, fmt.Errorf("ping PostgreSQL: %w", err)
 	}
 
-	return pool, nil
+	return pgxPool, nil
+}
+
+func Close(ctx context.Context, database *pgxpool.Pool) error {
+	closed := make(chan struct{})
+
+	go func() {
+		database.Close()
+		close(closed)
+	}()
+
+	select {
+	case <-closed:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("close PostgreSQL pool: %w", ctx.Err())
+	}
 }
 
 func validatePoolConfig(cfg PoolConfig) error {
@@ -72,28 +80,7 @@ func validatePoolConfig(cfg PoolConfig) error {
 		return errors.New("PostgreSQL max connection lifetime must be positive")
 	case cfg.ConnectTimeout <= 0:
 		return errors.New("PostgreSQL connect timeout must be positive")
-	case cfg.QueryTimeout <= 0:
-		return errors.New("PostgreSQL query timeout must be positive")
 	default:
 		return nil
 	}
-}
-
-func (p *Pool) Ping(ctx context.Context) error {
-	queryCtx, cancel := p.queryContext(ctx)
-	defer cancel()
-
-	if err := p.pool.Ping(queryCtx); err != nil {
-		return fmt.Errorf("ping PostgreSQL: %w", err)
-	}
-
-	return nil
-}
-
-func (p *Pool) Close() {
-	p.pool.Close()
-}
-
-func (p *Pool) queryContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(ctx, p.queryTimeout)
 }

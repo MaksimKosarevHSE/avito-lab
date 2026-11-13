@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"time"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 const cleanupBatchSize = 100
@@ -16,19 +18,31 @@ type CleanupJob struct {
 	cleaner  Cleaner
 	interval time.Duration
 	logger   *slog.Logger
+	tracer   trace.Tracer
 }
 
-func NewCleanupJob(cleaner Cleaner, interval time.Duration, logger *slog.Logger) *CleanupJob {
+func NewCleanupJob(
+	cleaner Cleaner,
+	interval time.Duration,
+	logger *slog.Logger,
+	tracer trace.Tracer,
+) *CleanupJob {
 	return &CleanupJob{
 		cleaner:  cleaner,
 		interval: interval,
 		logger:   logger.With("component", "idempotency-cleanup"),
+		tracer:   tracer,
 	}
 }
 
 func (j *CleanupJob) Run(ctx context.Context) {
+	j.logger.InfoContext(ctx, "component started")
+	defer j.logger.InfoContext(context.WithoutCancel(ctx), "component stopped")
+
 	for {
-		j.cleanup(ctx)
+		cleanupCtx, span := j.tracer.Start(ctx, "idempotency cleanup")
+		j.cleanup(cleanupCtx)
+		span.End()
 
 		timer := time.NewTimer(j.interval)
 		select {
