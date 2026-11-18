@@ -12,7 +12,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/create"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/create"
 )
 
 type createMetricsSpy struct {

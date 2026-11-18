@@ -18,7 +18,7 @@ import (
 	"github.com/MaksimKosarevHSE/avito-lab/api"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 	httpcreate "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/create"
-	create "github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/create"
+	create "github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/create"
 )
 
 type fixture struct {

@@ -49,18 +49,18 @@ linters:
               desc: domain must not build SQL
             - pkg: go.opentelemetry.io/otel
               desc: domain must not depend on telemetry
-        service:
+        usecase:
           files:
-            - "**/internal/service/**"
+            - "**/internal/usecase/**"
           deny:
             - pkg: net/http
-              desc: service must not depend on HTTP
+              desc: usecase must not depend on HTTP
             - pkg: github.com/go-chi/chi
-              desc: service must not depend on the router
+              desc: usecase must not depend on the router
             - pkg: github.com/jackc/pgx
-              desc: service must use consumer-side interfaces
+              desc: usecase must use consumer-side interfaces
             - pkg: github.com/Masterminds/squirrel
-              desc: service must not build SQL
+              desc: usecase must not build SQL
         http:
           files:
             - "**/internal/http/**"

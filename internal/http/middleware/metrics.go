@@ -57,18 +57,15 @@ func NewHTTPMetrics(meter metric.Meter) (*HTTPMetrics, error) {
 
 func Metrics(
 	instruments *HTTPMetrics,
-	routes ...chi.Routes,
+	routes chi.Routes,
 ) func(http.Handler) http.Handler {
 	if instruments == nil {
 		panic("metrics middleware requires HTTP metrics")
 	}
 
-	routeTable := optionalRoutes(routes)
-
 	return func(next http.Handler) http.Handler {
-		routeTable := routesForHandler(routeTable, next)
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			route := RouteTemplate(routeTable, r)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			route := matchRoute(routes, r)
 			requestAttrs := []attribute.KeyValue{
 				semconv.HTTPRequestMethodKey.String(metricMethod(r.Method)),
 				semconv.HTTPRoute(route),
@@ -114,8 +111,6 @@ func Metrics(
 			observed := httpsnoop.CaptureMetrics(next, w, r)
 			status = observed.Code
 		})
-
-		return carryRoutes(handler, routeTable)
 	}
 }
 

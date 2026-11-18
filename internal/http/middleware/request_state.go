@@ -3,7 +3,6 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"sync"
 
 	"go.opentelemetry.io/otel/trace"
 )
@@ -11,7 +10,6 @@ import (
 type requestStateKey struct{}
 
 type requestState struct {
-	mu              sync.RWMutex
 	spanContext     trace.SpanContext
 	panicFinalizers []func(status int)
 }
@@ -33,18 +31,13 @@ func (s *requestState) setSpanContext(spanContext trace.SpanContext) {
 		return
 	}
 
-	s.mu.Lock()
 	s.spanContext = spanContext
-	s.mu.Unlock()
 }
 
 func (s *requestState) getSpanContext() trace.SpanContext {
 	if s == nil {
 		return trace.SpanContext{}
 	}
-
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 
 	return s.spanContext
 }
@@ -54,9 +47,7 @@ func (s *requestState) addPanicFinalizer(finalizer func(status int)) bool {
 		return false
 	}
 
-	s.mu.Lock()
 	s.panicFinalizers = append(s.panicFinalizers, finalizer)
-	s.mu.Unlock()
 
 	return true
 }
@@ -66,10 +57,8 @@ func (s *requestState) runPanicFinalizers(status int) {
 		return
 	}
 
-	s.mu.Lock()
-	finalizers := append([]func(int){}, s.panicFinalizers...)
+	finalizers := s.panicFinalizers
 	s.panicFinalizers = nil
-	s.mu.Unlock()
 
 	for _, finalizer := range finalizers {
 		finalizer(status)

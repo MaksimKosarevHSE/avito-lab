@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	create "github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/create"
+	create "github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/create"
 	gomock "go.uber.org/mock/gomock"
 )
 

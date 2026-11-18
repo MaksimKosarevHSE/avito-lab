@@ -86,18 +86,17 @@ Testcontainers и запускаются отдельно через `make test-
 
 ```text
 cmd/trip-service → container
-                       ├── HTTP → service → domain
+                       ├── HTTP → usecase → domain
                        └── repository → domain
                               └── infra/postgres
 ```
 
 - `internal/domain` содержит модели, доменные правила и ошибки. Этот слой не
   зависит от HTTP, PostgreSQL и OpenTelemetry.
-- `internal/service/trip/<action>` — слой сценариев приложения. Здесь `service`
-  выполняет роль `usecase`; отдельные пакеты отвечают за создание, получение и
-  завершение поездки.
+- `internal/usecase/trip/<action>` — слой сценариев приложения; отдельные пакеты
+  отвечают за создание, получение и завершение поездки.
 - `internal/http/trip/<action>` разбирает HTTP-запросы, преобразует DTO и
-  вызывает только сервисный слой.
+  вызывает только usecase-слой.
 - `internal/repository/postgres/trip` реализует хранение поездок, а
   `internal/infra/postgres` отвечает за пул соединений, транзакции и
   инструментацию `pgx`.
@@ -106,8 +105,8 @@ cmd/trip-service → container
   конфигурацию, запускает приложение и выполняет graceful shutdown.
 
 Интерфейсы внешних зависимостей объявлены на стороне потребителя в файлах
-`contract.go`. Поэтому сервисы не импортируют PostgreSQL-репозиторий, а
-HTTP-обработчики не зависят от конкретной реализации сервиса. Каждый потребитель
+`contract.go`. Поэтому usecase-пакеты не импортируют PostgreSQL-репозиторий, а
+HTTP-обработчики не зависят от конкретной реализации usecase. Каждый потребитель
 описывает только нужный ему небольшой контракт; это упрощает замену реализаций и
 генерацию изолированных моков для unit-тестов. Направление зависимостей
 дополнительно проверяется `depguard` из `.golangci.yml`.
@@ -121,7 +120,7 @@ JSON-логи пишет в stdout. У каждой записи есть `servi
 Путь одного запроса выглядит так:
 
 ```text
-клиент → HTTP middleware → handler → service → repository → PostgreSQL
+клиент → HTTP middleware → handler → usecase → repository → PostgreSQL
              │                                      │
              └──────── общий context и trace ───────┘
 ```

@@ -5,7 +5,7 @@ package create
 import (
 	"context"
 
-	createuc "github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/create"
+	createuc "github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/create"
 )
 
 type tripCreator interface {

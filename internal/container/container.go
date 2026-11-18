@@ -25,9 +25,9 @@ import (
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres/transaction"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/repository/postgres/trip"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/create"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/finish"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/get"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/create"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/finish"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/get"
 )
 
 const (
@@ -166,22 +166,21 @@ func New(
 	problems := domainerror.NewWriter(logger)
 	requestValidator := httpmiddleware.OpenAPIValidator(openAPISpec, problems)
 	router := chi.NewRouter()
-	router.Use(httpmiddleware.BodyLimit(maxRequestBodyBytes, problems))
+	router.Use(
+		httpmiddleware.Recover(logger),
+		httpmiddleware.Tracing(providers.Traces),
+		httpmiddleware.Logging(logger),
+		httpmiddleware.Metrics(httpMetrics, router),
+		httpmiddleware.BodyLimit(maxRequestBodyBytes, problems),
+	)
 	generatedHandler := api.HandlerWithOptions(httpHandler, api.ChiServerOptions{
 		BaseRouter:       router,
 		Middlewares:      []api.MiddlewareFunc{requestValidator},
 		ErrorHandlerFunc: httpHandler.HandleParameterError,
 	})
-	observedHandler := httpmiddleware.Recover(logger)(
-		httpmiddleware.Tracing(providers.Traces, router)(
-			httpmiddleware.Logging(logger, router)(
-				httpmiddleware.Metrics(httpMetrics, router)(generatedHandler),
-			),
-		),
-	)
 	server := &http.Server{
 		Addr:              cfg.HTTP.Addr,
-		Handler:           observedHandler,
+		Handler:           generatedHandler,
 		ReadTimeout:       cfg.HTTP.ReadTimeout,
 		ReadHeaderTimeout: cfg.HTTP.ReadHeaderTimeout,
 		WriteTimeout:      cfg.HTTP.WriteTimeout,

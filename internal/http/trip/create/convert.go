@@ -3,7 +3,7 @@ package create
 import (
 	"github.com/MaksimKosarevHSE/avito-lab/api"
 	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	createuc "github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/create"
+	createuc "github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/create"
 )
 
 func toCreateInput(

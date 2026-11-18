@@ -11,7 +11,7 @@ import (
 	gomock "go.uber.org/mock/gomock"
 
 	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/finish"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/finish"
 )
 
 type fixture struct {

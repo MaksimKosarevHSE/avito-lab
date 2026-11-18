@@ -19,7 +19,7 @@ export OTEL_TRACES_SAMPLER OTEL_METRIC_EXPORT_INTERVAL
 .PHONY: generate migrate migrate-down migrate-status run lint test test-integration
 
 generate:
-	go generate ./internal/service/trip/... ./internal/http/trip/...
+	go generate ./internal/usecase/trip/... ./internal/http/trip/...
 	go tool oapi-codegen \
 		-config ./api/oapi-codegen.yaml \
 		-o ./api/api.gen.go \

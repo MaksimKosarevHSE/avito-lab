@@ -7,10 +7,10 @@ import (
 	"time"
 
 	triprepo "github.com/MaksimKosarevHSE/avito-lab/internal/repository/postgres/trip"
-	tripcreate "github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/create"
-	tripfinish "github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/finish"
-	tripget "github.com/MaksimKosarevHSE/avito-lab/internal/service/trip/get"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/testkit"
+	tripcreate "github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/create"
+	tripfinish "github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/finish"
+	tripget "github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/get"
 )
 
 const idempotencyTTL = 24 * time.Hour

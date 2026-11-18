@@ -6,28 +6,21 @@ import (
 	"time"
 
 	"github.com/felixge/httpsnoop"
-	"github.com/go-chi/chi/v5"
 )
 
-func Logging(
-	logger *slog.Logger,
-	routes ...chi.Routes,
-) func(http.Handler) http.Handler {
+func Logging(logger *slog.Logger) func(http.Handler) http.Handler {
 	if logger == nil {
 		panic("logging middleware requires a logger")
 	}
 
-	routeTable := optionalRoutes(routes)
-
 	return func(next http.Handler) http.Handler {
-		routeTable := routesForHandler(routeTable, next)
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			startedAt := time.Now()
 			status := http.StatusOK
 			writeLog := func(finalStatus int, panicked bool) {
 				args := []any{
 					"method", r.Method,
-					"route", RouteTemplate(routeTable, r),
+					"route", routePattern(r),
 					"status", finalStatus,
 					"duration_ms", time.Since(startedAt).Milliseconds(),
 				}
@@ -56,7 +49,5 @@ func Logging(
 			observed := httpsnoop.CaptureMetrics(next, w, r)
 			status = observed.Code
 		})
-
-		return carryRoutes(handler, routeTable)
 	}
 }
