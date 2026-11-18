@@ -13,7 +13,7 @@ const (
 	httpAddrEnv              = "HTTP_ADDR"
 	httpReadTimeoutEnv       = "HTTP_READ_TIMEOUT"
 	httpReadHeaderTimeoutEnv = "HTTP_READ_HEADER_TIMEOUT"
-	httpWriteTimeoutEnv      = "HTTP_WRITE_TIMEOUT"
+	httpResponseTimeoutEnv   = "HTTP_WRITE_TIMEOUT"
 	httpIdleTimeoutEnv       = "HTTP_IDLE_TIMEOUT"
 	logLevelEnv              = "LOG_LEVEL"
 	shutdownTimeoutEnv       = "SHUTDOWN_TIMEOUT"
@@ -71,7 +71,7 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	cfg.HTTP.WriteTimeout, err = requiredPositiveDuration(httpWriteTimeoutEnv)
+	cfg.HTTP.WriteTimeout, err = requiredPositiveDuration(httpResponseTimeoutEnv)
 	if err != nil {
 		return Config{}, err
 	}

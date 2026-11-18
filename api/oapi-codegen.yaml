@@ -2,6 +2,7 @@ package: api
 generate:
   models: true
   chi-server: true
+  embedded-spec: true
 output-options:
   include-operation-ids:
     - createTrip
