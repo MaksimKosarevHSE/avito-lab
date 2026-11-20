@@ -1,7 +1,12 @@
 package create
 
-import "context"
+import (
+	"context"
 
-type postitionCreator interface {
-	Create(ctx context.Context, input uspos.CreateInput) (api)
+	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/position"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/position/create"
+)
+
+type positionCreator interface {
+	Create(ctx context.Context, input create.Input) (position.Position, error)
 }

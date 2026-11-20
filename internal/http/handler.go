@@ -9,6 +9,8 @@ import (
 	"github.com/MaksimKosarevHSE/avito-lab/api"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/http/common"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/http/domainerror"
+	createposhttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/position/create"
+	getposhttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/position/get"
 	createhttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/create"
 	finishhttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/finish"
 	gethttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/get"
@@ -19,20 +21,25 @@ type pinger interface {
 }
 
 type Handler struct {
-	create       *createhttp.Handler
-	get          *gethttp.Handler
-	finish       *finishhttp.Handler
+	create *createhttp.Handler
+	get    *gethttp.Handler
+	finish *finishhttp.Handler
+
+	getPositions *getposhttp.Handler
+	createPos    *createposhttp.Handler
+
 	pinger       pinger
 	readyTimeout time.Duration
 	responses    *common.ResponseWriter
 	problems     *domainerror.Writer
-	
 }
 
 func NewHandler(
 	createHandler *createhttp.Handler,
 	getHandler *gethttp.Handler,
 	finishHandler *finishhttp.Handler,
+	getPositions *getposhttp.Handler,
+	createPos *createposhttp.Handler,
 	pinger pinger,
 	readyTimeout time.Duration,
 	logger *slog.Logger,
@@ -41,6 +48,8 @@ func NewHandler(
 		create:       createHandler,
 		get:          getHandler,
 		finish:       finishHandler,
+		getPositions: getPositions,
+		createPos:    createPos,
 		pinger:       pinger,
 		readyTimeout: readyTimeout,
 		responses:    common.NewResponseWriter(logger),
@@ -72,12 +81,12 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	h.responses.WriteJSON(w, r, http.StatusOK, api.HealthResponse{Status: api.Ok})
 }
 
-func (h *Handler) ListTripPositions(w http.ResponseWriter, r *http.Request, tripId TripId) {
-
+func (h *Handler) ListTripPositions(w http.ResponseWriter, r *http.Request, tripID api.TripId) {
+	h.getPositions.ListTripPositions(w, r, tripID)
 }
 
-func (h *Handler) CreateTripPosition(w http.ResponseWriter, r *http.Request, tripId TripId) {
-	
+func (h *Handler) CreateTripPosition(w http.ResponseWriter, r *http.Request, tripID api.TripId) {
+	h.createPos.CreateTripPosition(w, r, tripID)
 }
 
 func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {

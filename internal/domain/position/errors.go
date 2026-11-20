@@ -2,6 +2,4 @@ package position
 
 import "errors"
 
-var (
-	ErrInvalidPosition = errors.New("invalid position")
-)
+var ErrInvalidPosition = errors.New("invalid position")

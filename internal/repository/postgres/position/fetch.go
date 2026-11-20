@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/position"
-	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
 	"github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
+
+	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/position"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
 )
 
 func (r *Repository) GetListByTripID(ctx context.Context, tripId uuid.UUID) ([]position.Position, error) {
@@ -43,7 +44,6 @@ func (r *Repository) GetListByTripID(ctx context.Context, tripId uuid.UUID) ([]p
 
 		return rows.Err()
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("list positions: %w", err)
 	}

@@ -22,7 +22,6 @@ func (r *Repository) Create(ctx context.Context, pos position.Position) (positio
 		).
 		Suffix("RETURNING " + strings.Join(positionColumns, ", ")).
 		ToSql()
-
 	if err != nil {
 		return position.Position{}, fmt.Errorf("build create position query: %w", err)
 	}

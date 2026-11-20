@@ -23,7 +23,6 @@ func NewPosition(
 	longitude float64,
 	recordedAt time.Time,
 	createdAt time.Time,
-
 ) (*Position, error) {
 	switch {
 	case tripID == uuid.Nil:

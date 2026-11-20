@@ -72,7 +72,6 @@ func (r *Repository) UpdateLastPositionAt(ctx context.Context, id uuid.UUID, rec
 		}
 		return nil
 	})
-
 	if err != nil {
 		return fmt.Errorf("update last trip position : %w", err)
 	}

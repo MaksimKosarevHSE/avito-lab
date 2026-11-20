@@ -3,33 +3,29 @@ package create
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/position"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	"github.com/google/uuid"
 )
 
 type Service struct {
 	positionRepository positionRepository
 	tripRepository     tripRepository
 	txManager          txManager
-
-	logger *slog.Logger
 }
 
 func NewService(
 	positionRepository positionRepository,
 	tripRepository tripRepository,
 	txManager txManager,
-	logger *slog.Logger,
 ) *Service {
 	return &Service{
 		positionRepository: positionRepository,
 		tripRepository:     tripRepository,
 		txManager:          txManager,
-		logger:             logger,
 	}
 }
 
@@ -83,7 +79,6 @@ func (s *Service) Create(ctx context.Context, input Input) (position.Position, e
 		}
 		return nil
 	})
-
 	if err != nil {
 		return position.Position{}, fmt.Errorf("create position transaction: %w", err)
 	}

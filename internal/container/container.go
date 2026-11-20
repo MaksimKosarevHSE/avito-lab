@@ -17,6 +17,8 @@ import (
 	httpapi "github.com/MaksimKosarevHSE/avito-lab/internal/http"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/http/domainerror"
 	httpmiddleware "github.com/MaksimKosarevHSE/avito-lab/internal/http/middleware"
+	createposhttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/position/create"
+	getposhttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/position/get"
 	createhttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/create"
 	finishhttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/finish"
 	gethttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/get"
@@ -24,7 +26,10 @@ import (
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres/transaction"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry"
+	posrepo "github.com/MaksimKosarevHSE/avito-lab/internal/repository/postgres/position"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/repository/postgres/trip"
+	createpos "github.com/MaksimKosarevHSE/avito-lab/internal/usecase/position/create"
+	getpos "github.com/MaksimKosarevHSE/avito-lab/internal/usecase/position/get"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/create"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/finish"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/get"
@@ -154,10 +159,17 @@ func New(
 		repository,
 		finish.WithObservability(logger, tripMetrics),
 	)
+
+	positionRepository := posrepo.NewRepository(database)
+	createPosService := createpos.NewService(positionRepository, repository, txManager)
+	getPosService := getpos.NewService(positionRepository, repository)
+
 	httpHandler := httpapi.NewHandler(
 		createhttp.New(createService, logger),
 		gethttp.New(getService, logger),
 		finishhttp.New(finishService, logger),
+		getposhttp.New(getPosService, logger),
+		createposhttp.New(createPosService, logger),
 		pool,
 		cfg.Database.QueryTimeout,
 		logger,

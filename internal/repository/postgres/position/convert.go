@@ -1,8 +1,9 @@
 package position
 
 import (
-	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/position"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/position"
 )
 
 func scanPosition(row pgx.Row) (position.Position, error) {

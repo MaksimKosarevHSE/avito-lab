@@ -4,9 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/position"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	"github.com/google/uuid"
 )
 
 type positionRepository interface {
