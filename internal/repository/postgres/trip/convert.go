@@ -24,6 +24,7 @@ func scanTrip(row pgx.Row) (domaintrip.Trip, error) {
 		&result.FinishedAt,
 		&result.CreatedAt,
 		&result.UpdatedAt,
+		&result.LastPositionAt,
 	)
 	if err != nil {
 		return domaintrip.Trip{}, err
@@ -35,6 +36,10 @@ func scanTrip(row pgx.Row) (domaintrip.Trip, error) {
 	if result.FinishedAt != nil {
 		finishedAt := result.FinishedAt.UTC()
 		result.FinishedAt = &finishedAt
+	}
+	if result.LastPositionAt != nil {
+		positionAt := result.LastPositionAt.UTC()
+		result.LastPositionAt = &positionAt
 	}
 
 	result.Status = domaintrip.Status(status)

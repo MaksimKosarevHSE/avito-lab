@@ -29,6 +29,7 @@ type Trip struct {
 	FinishedAt     *time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	LastPositionAt *time.Time
 }
 
 func validCoordinate(value, minValue, maxValue float64) bool {

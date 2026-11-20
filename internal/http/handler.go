@@ -26,6 +26,7 @@ type Handler struct {
 	readyTimeout time.Duration
 	responses    *common.ResponseWriter
 	problems     *domainerror.Writer
+	
 }
 
 func NewHandler(
@@ -69,6 +70,14 @@ func (h *Handler) HandleParameterError(w http.ResponseWriter, r *http.Request, e
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	h.responses.WriteJSON(w, r, http.StatusOK, api.HealthResponse{Status: api.Ok})
+}
+
+func (h *Handler) ListTripPositions(w http.ResponseWriter, r *http.Request, tripId TripId) {
+
+}
+
+func (h *Handler) CreateTripPosition(w http.ResponseWriter, r *http.Request, tripId TripId) {
+	
 }
 
 func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {

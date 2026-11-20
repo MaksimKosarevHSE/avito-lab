@@ -29,6 +29,7 @@ func (r *Repository) Create(ctx context.Context, value domaintrip.Trip) error {
 			value.FinishedAt,
 			value.CreatedAt,
 			value.UpdatedAt,
+			value.LastPositionAt,
 		).
 		ToSql()
 	if err != nil {
