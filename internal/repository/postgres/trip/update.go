@@ -45,7 +45,7 @@ func (r *Repository) Update(ctx context.Context, value domaintrip.Trip) error {
 func (r *Repository) UpdateLastPositionAt(ctx context.Context, id uuid.UUID, recordedAt time.Time) error {
 	query, args, err := r.builder.
 		Update(tripsTable).
-		Set(lastPositionAt, sq.Expr(
+		Set(lastPositionAtColumn, sq.Expr(
 			`CASE
 					WHEN last_position_at IS NULL 
 					OR last_position_at < ?

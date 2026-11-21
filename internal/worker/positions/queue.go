@@ -23,17 +23,17 @@ type PriorityQueue struct {
 	closed   bool
 }
 
-type PushStatus string
+type EnqueueStatus string
 
 type EnqueueResult struct {
-	Status  PushStatus
+	Status  EnqueueStatus
 	Removed *SelectedTrip
 }
 
 const (
-	PushStatusQueued    PushStatus = "queued"
-	PushStatusDuplicate PushStatus = "duplicate"
-	PushStatusDropped   PushStatus = "dropped"
+	PushStatusQueued    EnqueueStatus = "queued"
+	PushStatusDuplicate EnqueueStatus = "duplicate"
+	PushStatusDropped   EnqueueStatus = "dropped"
 )
 
 func NewPriorityQueue(capacity int) *PriorityQueue {
@@ -173,7 +173,7 @@ func (h heap) Swap(i, j int) {
 }
 
 func higherPriority(a, b SelectedTrip) bool {
-	return a.DontTrackedAfter.Before(b.DontTrackedAfter)
+	return a.LastTrackedAt.Before(b.LastTrackedAt)
 }
 
 var _ standart_heap.Interface = (*heap)(nil)

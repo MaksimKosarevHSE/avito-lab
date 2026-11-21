@@ -25,7 +25,7 @@ const (
 	finishedAtColumn     = "finished_at"
 	createdAtColumn      = "created_at"
 	updatedAtColumn      = "updated_at"
-	lastPositionAt       = "last_position_at"
+	lastPositionAtColumn = "last_position_at"
 
 	tripIDColumn     = "trip_id"
 	fromStatusColumn = "from_status"
@@ -53,7 +53,7 @@ var tripColumns = []string{
 	finishedAtColumn,
 	createdAtColumn,
 	updatedAtColumn,
-	lastPositionAt,
+	lastPositionAtColumn,
 }
 
 var statusHistoryColumns = []string{

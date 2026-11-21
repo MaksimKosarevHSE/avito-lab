@@ -4,6 +4,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/worker/positions"
 )
 
 func scanTrip(row pgx.Row) (domaintrip.Trip, error) {
@@ -43,5 +44,19 @@ func scanTrip(row pgx.Row) (domaintrip.Trip, error) {
 	}
 
 	result.Status = domaintrip.Status(status)
+	return result, nil
+}
+
+func ScanTripForPush(row pgx.Row) (positions.SelectedTrip, error) {
+	var result positions.SelectedTrip
+	err := row.Scan(
+		&result.TripID,
+		&result.DriverID,
+		&result.LastTrackedAt,
+	)
+	if err != nil {
+		return positions.SelectedTrip{}, err
+	}
+	result.LastTrackedAt = result.LastTrackedAt.UTC()
 	return result, nil
 }

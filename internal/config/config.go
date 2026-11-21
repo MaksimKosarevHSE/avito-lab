@@ -10,21 +10,28 @@ import (
 )
 
 const (
-	httpAddrEnv              = "HTTP_ADDR"
-	httpReadTimeoutEnv       = "HTTP_READ_TIMEOUT"
-	httpReadHeaderTimeoutEnv = "HTTP_READ_HEADER_TIMEOUT"
-	httpResponseTimeoutEnv   = "HTTP_WRITE_TIMEOUT"
-	httpIdleTimeoutEnv       = "HTTP_IDLE_TIMEOUT"
-	logLevelEnv              = "LOG_LEVEL"
-	shutdownTimeoutEnv       = "SHUTDOWN_TIMEOUT"
-	idempotencyTTLEnv        = "IDEMPOTENCY_TTL"
-	idempotencyCleanupEnv    = "IDEMPOTENCY_CLEANUP_INTERVAL"
-	databaseURLEnv           = "DATABASE_URL"
-	databaseMaxConnsEnv      = "DATABASE_MAX_CONNS"
-	databaseMinConnsEnv      = "DATABASE_MIN_CONNS"
-	databaseMaxLifetimeEnv   = "DATABASE_MAX_CONN_LIFETIME"
-	databaseConnectEnv       = "DATABASE_CONNECT_TIMEOUT"
-	databaseQueryEnv         = "DATABASE_QUERY_TIMEOUT"
+	httpAddrEnv               = "HTTP_ADDR"
+	httpReadTimeoutEnv        = "HTTP_READ_TIMEOUT"
+	httpReadHeaderTimeoutEnv  = "HTTP_READ_HEADER_TIMEOUT"
+	httpResponseTimeoutEnv    = "HTTP_WRITE_TIMEOUT"
+	httpIdleTimeoutEnv        = "HTTP_IDLE_TIMEOUT"
+	logLevelEnv               = "LOG_LEVEL"
+	shutdownTimeoutEnv        = "SHUTDOWN_TIMEOUT"
+	idempotencyTTLEnv         = "IDEMPOTENCY_TTL"
+	idempotencyCleanupEnv     = "IDEMPOTENCY_CLEANUP_INTERVAL"
+	databaseURLEnv            = "DATABASE_URL"
+	databaseMaxConnsEnv       = "DATABASE_MAX_CONNS"
+	databaseMinConnsEnv       = "DATABASE_MIN_CONNS"
+	databaseMaxLifetimeEnv    = "DATABASE_MAX_CONN_LIFETIME"
+	databaseConnectEnv        = "DATABASE_CONNECT_TIMEOUT"
+	databaseQueryEnv          = "DATABASE_QUERY_TIMEOUT"
+	positionCheckIntervalEnv  = "POSITION_CHECK_INTERVAL"
+	positionsStaleAfterEnv    = "POSITION_STALE_AFTER"
+	positionsWorkersEnv       = "POSITION_WORKERS"
+	positionsQueueSizeEnv     = "POSITION_QUEUE_SIZE"
+	positionsScanBatchSizeEnv = "POSITION_SCAN_BATCH_SIZE"
+	pushHTTPURLEnv            = "PUSH_HTTP_URL"
+	pushRequestTimeoutEnv     = "PUSH_REQUEST_TIMEOUT"
 )
 
 type Config struct {
@@ -34,8 +41,22 @@ type Config struct {
 	ShutdownTimeout            time.Duration
 	IdempotencyTTL             time.Duration
 	IdempotencyCleanupInterval time.Duration
+	Position                   PositionConfig
+	Push                       PushConfig
 }
 
+type PositionConfig struct {
+	CheckInterval time.Duration
+	StaleAfter    time.Duration
+	ScanBatchSize int32
+	Workers       int32
+	QueueSize     int32
+}
+
+type PushConfig struct {
+	HTTPURL        string
+	RequestTimeout time.Duration
+}
 type HTTPConfig struct {
 	Addr              string
 	ReadTimeout       time.Duration
@@ -132,6 +153,36 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	cfg.Database.QueryTimeout, err = requiredPositiveDuration(databaseQueryEnv)
+	if err != nil {
+		return Config{}, err
+	}
+
+	cfg.Position.CheckInterval, err = requiredPositiveDuration(positionCheckIntervalEnv)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.Position.ScanBatchSize, err = requiredInt32(positionsScanBatchSizeEnv, 1)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.Position.QueueSize, err = requiredInt32(positionsQueueSizeEnv, 1)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.Position.Workers, err = requiredInt32(positionsWorkersEnv, 1)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.Position.StaleAfter, err = requiredPositiveDuration(positionsStaleAfterEnv)
+	if err != nil {
+		return Config{}, err
+	}
+
+	cfg.Push.HTTPURL, err = requiredString(pushHTTPURLEnv)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.Push.RequestTimeout, err = requiredPositiveDuration(pushRequestTimeoutEnv)
 	if err != nil {
 		return Config{}, err
 	}
