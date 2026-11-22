@@ -1,8 +1,9 @@
 package trip
 
 import (
-	"github.com/MaksimKosarevHSE/avito-lab/internal/worker/positions"
 	sq "github.com/Masterminds/squirrel"
+
+	"github.com/MaksimKosarevHSE/avito-lab/internal/worker/positions"
 )
 
 type Repository struct {

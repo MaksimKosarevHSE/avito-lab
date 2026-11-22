@@ -54,8 +54,8 @@ func (j *SelectionJob) Run(ctx context.Context) {
 
 func (j *SelectionJob) fetchForPushQuery(ctx context.Context) {
 	var nextPtr *FetchForPushPtr = nil
-	stoped := false
-	for !stoped {
+	stopped := false
+	for !stopped {
 		result, err := j.tripBatchSelector.FetchForPushQuery(
 			ctx,
 			j.positionStaleAfter,
@@ -63,21 +63,43 @@ func (j *SelectionJob) fetchForPushQuery(ctx context.Context) {
 			nextPtr,
 		)
 		if err != nil {
-			j.logger.ErrorContext(ctx, "fetch for push query", "error", err)
+			if ctx.Err() == nil {
+				j.logger.ErrorContext(ctx, "fetch for push query", "error", err)
+			}
 			return
 		}
 
 		for _, trip := range result.SelectedTrips {
 			enqueueResult := j.tripEnqueuer.Enqueue(trip)
-			if enqueueResult.Status == PushStatusDropped {
-				stoped = true
+			switch enqueueResult.Status {
+			case PushStatusClosed:
+				return
+			case PushStatusDropped:
+				j.logger.WarnContext(
+					ctx,
+					"position request dropped because queue is full",
+					"trip_id", trip.TripID,
+				)
+				stopped = true
+			}
+
+			if enqueueResult.Removed != nil {
+				j.logger.WarnContext(
+					ctx,
+					"position request evicted from full queue",
+					"trip_id", enqueueResult.Removed.TripID,
+					"replacement_trip_id", trip.TripID,
+				)
+			}
+
+			if stopped {
 				break
 			}
 		}
 		nextPtr = result.NextPtr
 
 		if len(result.SelectedTrips) < int(j.positionScanBatchSize) {
-			stoped = true
+			stopped = true
 		}
 	}
 }

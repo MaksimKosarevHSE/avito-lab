@@ -12,6 +12,8 @@ export HTTP_READ_TIMEOUT HTTP_READ_HEADER_TIMEOUT HTTP_WRITE_TIMEOUT HTTP_IDLE_T
 export IDEMPOTENCY_TTL IDEMPOTENCY_CLEANUP_INTERVAL
 export DATABASE_URL DATABASE_MAX_CONNS DATABASE_MIN_CONNS
 export DATABASE_MAX_CONN_LIFETIME DATABASE_CONNECT_TIMEOUT DATABASE_QUERY_TIMEOUT
+export POSITION_CHECK_INTERVAL POSITION_STALE_AFTER POSITION_SCAN_BATCH_SIZE
+export POSITION_WORKERS POSITION_QUEUE_SIZE PUSH_HTTP_URL PUSH_REQUEST_TIMEOUT
 export OTEL_SERVICE_NAME OTEL_EXPORTER_OTLP_ENDPOINT
 export OTEL_EXPORTER_OTLP_PROTOCOL OTEL_RESOURCE_ATTRIBUTES
 export OTEL_TRACES_SAMPLER OTEL_METRIC_EXPORT_INTERVAL
@@ -24,6 +26,10 @@ generate:
 		-config ./api/oapi-codegen.yaml \
 		-o ./api/api.gen.go \
 		./contracts/openapi/trip-service.openapi.yaml
+	go tool oapi-codegen \
+		-config ./api/push/oapi-codegen.yaml \
+		-o ./api/push/api.gen.go \
+		./contracts/openapi/push-service.openapi.yaml
 
 migrate:
 	go tool goose -dir ./migrations postgres "$$DATABASE_URL" up

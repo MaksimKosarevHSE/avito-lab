@@ -14,6 +14,7 @@ import (
 
 	"github.com/MaksimKosarevHSE/avito-lab/api"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/config"
+	push "github.com/MaksimKosarevHSE/avito-lab/internal/gateway/push"
 	httpapi "github.com/MaksimKosarevHSE/avito-lab/internal/http"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/http/domainerror"
 	httpmiddleware "github.com/MaksimKosarevHSE/avito-lab/internal/http/middleware"
@@ -33,6 +34,7 @@ import (
 	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/create"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/finish"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/get"
+	posworker "github.com/MaksimKosarevHSE/avito-lab/internal/worker/positions"
 )
 
 const (
@@ -41,9 +43,12 @@ const (
 )
 
 type Container struct {
-	HTTPServer *http.Server
-	CleanupJob *idempotency.CleanupJob
-	Logger     *slog.Logger
+	HTTPServer       *http.Server
+	CleanupJob       *idempotency.CleanupJob
+	TripSelectionJob *posworker.SelectionJob
+	PushWorkerPool   *posworker.WorkerPool
+
+	Logger *slog.Logger
 
 	pool      *pgxpool.Pool
 	telemetry *telemetry.Providers
@@ -161,7 +166,23 @@ func New(
 	)
 
 	positionRepository := posrepo.NewRepository(database)
-	createPosService := createpos.NewService(positionRepository, repository, txManager)
+
+	positionQueue := posworker.NewPriorityQueue(int(cfg.Position.QueueSize))
+
+	positionSelectionJob := posworker.NewSelectionJob(
+		cfg.Position.StaleAfter,
+		cfg.Position.ScanBatchSize,
+		cfg.Position.CheckInterval,
+		repository, positionQueue,
+		logger,
+	)
+	positionPusher, err := push.NewPushHTTPClient(cfg.Push.HTTPURL, cfg.Push.RequestTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("create HTTP client for push service: %w", err)
+	}
+	positionWorkerPool := posworker.NewWorkerPool(cfg.Position.Workers, positionQueue, positionPusher, logger)
+
+	createPosService := createpos.NewService(positionRepository, repository, txManager, positionQueue)
 	getPosService := getpos.NewService(positionRepository, repository)
 
 	httpHandler := httpapi.NewHandler(
@@ -208,11 +229,14 @@ func New(
 	created = true
 
 	return &Container{
-		HTTPServer: server,
-		CleanupJob: cleanupJob,
-		Logger:     logger,
-		pool:       pool,
-		telemetry:  providers,
+		HTTPServer:       server,
+		CleanupJob:       cleanupJob,
+		TripSelectionJob: positionSelectionJob,
+
+		PushWorkerPool: positionWorkerPool,
+		Logger:         logger,
+		pool:           pool,
+		telemetry:      providers,
 	}, nil
 }
 

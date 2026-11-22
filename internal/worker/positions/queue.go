@@ -1,7 +1,7 @@
 package positions
 
 import (
-	standart_heap "container/heap"
+	stdheap "container/heap"
 	"sync"
 
 	"github.com/google/uuid"
@@ -34,6 +34,7 @@ const (
 	PushStatusQueued    EnqueueStatus = "queued"
 	PushStatusDuplicate EnqueueStatus = "duplicate"
 	PushStatusDropped   EnqueueStatus = "dropped"
+	PushStatusClosed    EnqueueStatus = "closed"
 )
 
 func NewPriorityQueue(capacity int) *PriorityQueue {
@@ -55,6 +56,10 @@ func NewPriorityQueue(capacity int) *PriorityQueue {
 func (q *PriorityQueue) Enqueue(trip SelectedTrip) EnqueueResult {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
+
+	if q.closed {
+		return EnqueueResult{Status: PushStatusClosed}
+	}
 
 	if _, ok := q.getByKey[trip.TripID]; ok {
 		return EnqueueResult{
@@ -79,7 +84,7 @@ func (q *PriorityQueue) Enqueue(trip SelectedTrip) EnqueueResult {
 		}
 	}
 
-	removed := standart_heap.Remove(&q.h, mostRecentIndex).(*queueItem)
+	removed := stdheap.Remove(&q.h, mostRecentIndex).(*queueItem)
 	delete(q.getByKey, removed.trip.TripID)
 
 	q.push(trip)
@@ -102,7 +107,7 @@ func (q *PriorityQueue) Take() (SelectedTrip, bool) {
 		return SelectedTrip{}, false
 	}
 
-	pop := standart_heap.Pop(&q.h).(*queueItem)
+	pop := stdheap.Pop(&q.h).(*queueItem)
 
 	return pop.trip, true
 }
@@ -126,7 +131,7 @@ func (q *PriorityQueue) Cancel(tripID uuid.UUID) {
 		return
 	}
 
-	removed := standart_heap.Remove(&q.h, item.index).(*queueItem)
+	removed := stdheap.Remove(&q.h, item.index).(*queueItem)
 
 	delete(q.getByKey, removed.trip.TripID)
 }
@@ -164,9 +169,7 @@ func (h heap) Less(i, j int) bool {
 }
 
 func (h heap) Swap(i, j int) {
-	tmp := h[i]
-	h[i] = h[j]
-	h[j] = tmp
+	h[i], h[j] = h[j], h[i]
 
 	h[i].index = i
 	h[j].index = j
@@ -176,13 +179,13 @@ func higherPriority(a, b SelectedTrip) bool {
 	return a.LastTrackedAt.Before(b.LastTrackedAt)
 }
 
-var _ standart_heap.Interface = (*heap)(nil)
+var _ stdheap.Interface = (*heap)(nil)
 
 func (q *PriorityQueue) push(trip SelectedTrip) {
 	item := &queueItem{
 		trip: trip,
 	}
-	standart_heap.Push(&q.h, item)
+	stdheap.Push(&q.h, item)
 	q.getByKey[item.trip.TripID] = item
 }
 

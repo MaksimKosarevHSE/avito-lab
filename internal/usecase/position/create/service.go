@@ -12,20 +12,23 @@ import (
 )
 
 type Service struct {
-	positionRepository positionRepository
-	tripRepository     tripRepository
-	txManager          txManager
+	positionRepository    positionRepository
+	tripRepository        tripRepository
+	txManager             txManager
+	positionPushCanceller positionPushCanceller
 }
 
 func NewService(
 	positionRepository positionRepository,
 	tripRepository tripRepository,
 	txManager txManager,
+	positionPushCanceller positionPushCanceller,
 ) *Service {
 	return &Service{
-		positionRepository: positionRepository,
-		tripRepository:     tripRepository,
-		txManager:          txManager,
+		positionRepository:    positionRepository,
+		tripRepository:        tripRepository,
+		txManager:             txManager,
+		positionPushCanceller: positionPushCanceller,
 	}
 }
 
@@ -82,6 +85,6 @@ func (s *Service) Create(ctx context.Context, input Input) (position.Position, e
 	if err != nil {
 		return position.Position{}, fmt.Errorf("create position transaction: %w", err)
 	}
-
+	s.positionPushCanceller.Cancel(value.TripID)
 	return createResult, nil
 }

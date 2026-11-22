@@ -1,0 +1,10 @@
+package: pushapi
+
+generate:
+  models: true
+  client: true
+
+output-options:
+  include-operation-ids:
+    - sendPush
+    - pushHealth

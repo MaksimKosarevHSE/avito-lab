@@ -59,6 +59,20 @@ func run() error {
 		cont.CleanupJob.Run(cleanupContext)
 	}()
 
+	selectionContext, cancelSelection := context.WithCancel(context.Background())
+	selectionDone := make(chan struct{})
+	go func() {
+		defer close(selectionDone)
+		cont.TripSelectionJob.Run(selectionContext)
+	}()
+
+	workerContext, cancelWorkers := context.WithCancel(context.Background())
+	workerDone := make(chan struct{})
+	go func() {
+		defer close(workerDone)
+		cont.PushWorkerPool.Start(workerContext)
+	}()
+
 	var shutdownErr error
 	select {
 	case <-serveDone:
@@ -67,12 +81,13 @@ func run() error {
 		cont.Logger.Info("shutdown signal received")
 	}
 
-	httpShutdownCtx, cancelHTTPShutdown := context.WithTimeout(
+	shutdownCtx, cancelShutdown := context.WithTimeout(
 		context.Background(),
 		cfg.ShutdownTimeout,
 	)
+	defer cancelShutdown()
 
-	if err := cont.HTTPServer.Shutdown(httpShutdownCtx); err != nil {
+	if err := cont.HTTPServer.Shutdown(shutdownCtx); err != nil {
 		shutdownErr = errors.Join(shutdownErr, fmt.Errorf("graceful HTTP shutdown: %w", err))
 		if closeErr := cont.HTTPServer.Close(); closeErr != nil {
 			shutdownErr = errors.Join(
@@ -81,36 +96,48 @@ func run() error {
 			)
 		}
 	}
-	cancelHTTPShutdown()
 
 	cancelCleanup()
-	cleanupShutdownCtx, cancelCleanupShutdown := context.WithTimeout(
-		context.Background(),
-		cfg.ShutdownTimeout,
-	)
+	cancelSelection()
 	select {
 	case <-cleanupDone:
-	case <-cleanupShutdownCtx.Done():
+	case <-shutdownCtx.Done():
 		shutdownErr = errors.Join(
 			shutdownErr,
-			fmt.Errorf("stop idempotency cleanup: %w", cleanupShutdownCtx.Err()),
+			fmt.Errorf("stop idempotency cleanup: %w", shutdownCtx.Err()),
 		)
 	}
-	cancelCleanupShutdown()
+
+	select {
+	case <-selectionDone:
+	case <-shutdownCtx.Done():
+		shutdownErr = errors.Join(
+			shutdownErr,
+			fmt.Errorf("stop trip selection job: %w", shutdownCtx.Err()),
+		)
+	}
+
+	cont.PushWorkerPool.Stop()
+	select {
+	case <-workerDone:
+	case <-shutdownCtx.Done():
+		shutdownErr = errors.Join(
+			shutdownErr,
+			fmt.Errorf("stop push workers: %w", shutdownCtx.Err()),
+		)
+		cancelWorkers()
+		<-workerDone
+	}
+	cancelWorkers()
 
 	<-serveDone
 	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
 		shutdownErr = errors.Join(shutdownErr, fmt.Errorf("serve HTTP: %w", serveErr))
 	}
 
-	resourceShutdownCtx, cancelResourceShutdown := context.WithTimeout(
-		context.Background(),
-		cfg.ShutdownTimeout,
-	)
-	if err := cont.Close(resourceShutdownCtx); err != nil {
+	if err := cont.Close(shutdownCtx); err != nil {
 		shutdownErr = errors.Join(shutdownErr, err)
 	}
-	cancelResourceShutdown()
 
 	if shutdownErr != nil {
 		return fmt.Errorf("service shutdown: %w", shutdownErr)
