@@ -122,18 +122,17 @@ func (q *PriorityQueue) Complete(tripID uuid.UUID) {
 	delete(q.getByKey, tripID)
 }
 
-func (q *PriorityQueue) Cancel(tripID uuid.UUID) {
+func (q *PriorityQueue) Cancel(tripID uuid.UUID) bool {
 	q.mutex.Lock()
 	defer q.mutex.Unlock()
 
 	item, ok := q.getByKey[tripID]
 	if !ok || item.index < 0 {
-		return
+		return false
 	}
-
 	removed := stdheap.Remove(&q.h, item.index).(*queueItem)
-
 	delete(q.getByKey, removed.trip.TripID)
+	return true
 }
 
 func (q *PriorityQueue) Close() {
@@ -162,6 +161,12 @@ func (h *heap) Pop() any {
 
 func (h heap) Len() int {
 	return len(h)
+}
+
+func (q *PriorityQueue) Len() int {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+	return q.h.Len()
 }
 
 func (h heap) Less(i, j int) bool {

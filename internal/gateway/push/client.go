@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	ErrServiceUnavailable = errors.New("push service unavailable")
-	ErrUnexpectedResponse = errors.New("push service returned unexpected response")
+	ErrServiceUnavailable = errors.New("push service unavailable 5xx")
+	ErrRequestError       = errors.New("push service respond 4xx")
+	ErrUnexpectedResponse = errors.New("push service respond unexpected error")
 )
 
 type PushHTTPClient struct {
@@ -64,6 +65,8 @@ func (c *PushHTTPClient) PushPosition(ctx context.Context, tripID, driverID uuid
 	switch {
 	case status >= http.StatusInternalServerError:
 		return fmt.Errorf("%w: status code %d", ErrServiceUnavailable, status)
+	case status >= http.StatusBadRequest && status < http.StatusInternalServerError:
+		return fmt.Errorf("%w: status code %d", ErrRequestError, status)
 	default:
 		return fmt.Errorf("%w: status code %d", ErrUnexpectedResponse, status)
 	}

@@ -4,8 +4,11 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
 )
 
 type TripSupplier interface {
@@ -19,22 +22,32 @@ type PositionPusher interface {
 }
 
 type WorkerPool struct {
-	workersCount   int32
-	tripSupplier   TripSupplier
-	positionPusher PositionPusher
-	logger         *slog.Logger
+	workersCount    int32
+	tripSupplier    TripSupplier
+	positionPusher  PositionPusher
+	logger          *slog.Logger
+	positionMetrics WorkerPositionMetrics
 }
 
-func NewWorkerPool(workersCount int32, tripSupplier TripSupplier, positionPusher PositionPusher, logger *slog.Logger) *WorkerPool {
+func NewWorkerPool(workersCount int32,
+	tripSupplier TripSupplier,
+	positionPusher PositionPusher,
+	logger *slog.Logger,
+	workerPositionMetrics WorkerPositionMetrics,
+) *WorkerPool {
 	return &WorkerPool{
-		workersCount:   workersCount,
-		tripSupplier:   tripSupplier,
-		positionPusher: positionPusher,
-		logger:         logger,
+		workersCount:    workersCount,
+		tripSupplier:    tripSupplier,
+		positionPusher:  positionPusher,
+		logger:          logger.With("component", "position-worker-pool"),
+		positionMetrics: workerPositionMetrics,
 	}
 }
 
 func (wp *WorkerPool) Start(ctx context.Context) {
+	wp.logger.InfoContext(ctx, "component started")
+	defer wp.logger.InfoContext(context.WithoutCancel(ctx), "component stopped")
+
 	var wg sync.WaitGroup
 	wg.Add(int(wp.workersCount))
 	for i := range wp.workersCount {
@@ -69,11 +82,28 @@ func (wp *WorkerPool) worker(ctx context.Context, _ int, wg *sync.WaitGroup) {
 		if ctx.Err() != nil {
 			return
 		}
-
-		err := wp.positionPusher.PushPosition(ctx, trip.TripID, trip.DriverID)
-		wp.tripSupplier.Complete(trip.TripID)
-		if err != nil {
-			wp.logger.WarnContext(ctx, "push position failed", "trip_id", trip.TripID, "error", err)
-		}
+		wp.pushPosition(ctx, trip.TripID, trip.DriverID)
 	}
+}
+
+func (wp *WorkerPool) pushPosition(ctx context.Context, tripID, driverID uuid.UUID) {
+	wp.positionMetrics.IncrementActiveWorkers()
+	defer wp.positionMetrics.DecrementActiveWorkers()
+	defer wp.tripSupplier.Complete(tripID)
+
+	reqResult := position.PositionRequestResultSuccess
+
+	startedAt := time.Now()
+	err := wp.positionPusher.PushPosition(ctx, tripID, driverID)
+	duration := time.Since(startedAt)
+
+	if err != nil {
+		reqResult = position.PositionRequestResultError
+		wp.logger.WarnContext(ctx, "push position failed", "trip_id", tripID, "error", err)
+	}
+
+	wp.positionMetrics.AddPositionRequestResult(
+		ctx, reqResult,
+		duration,
+	)
 }

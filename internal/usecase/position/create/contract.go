@@ -8,6 +8,7 @@ import (
 
 	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/position"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
+	posmetrics "github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
 )
 
 type positionRepository interface {
@@ -24,5 +25,10 @@ type txManager interface {
 }
 
 type positionPushCanceller interface {
-	Cancel(tripID uuid.UUID)
+	Cancel(tripID uuid.UUID) bool
+}
+
+type positionSaveMetrics interface {
+	AddPositionSaved(ctx context.Context)
+	AddPositionRequestResult(ctx context.Context, result posmetrics.PositionRequestResult, duration time.Duration)
 }

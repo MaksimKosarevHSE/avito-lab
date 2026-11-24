@@ -27,6 +27,7 @@ import (
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres/transaction"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry"
+	posmetrics "github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
 	posrepo "github.com/MaksimKosarevHSE/avito-lab/internal/repository/postgres/position"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/repository/postgres/trip"
 	createpos "github.com/MaksimKosarevHSE/avito-lab/internal/usecase/position/create"
@@ -152,6 +153,45 @@ func New(
 		return nil, fmt.Errorf("create HTTP metrics: %w", err)
 	}
 
+	positionQueue := posworker.NewPriorityQueue(int(cfg.Position.QueueSize))
+
+	positionMetrics, err := posmetrics.NewPositionsMetrics(
+		providers.Metrics.Meter(serviceName+"/position"),
+		positionQueue.Len,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create position metrics: %w", err)
+	}
+
+	positionRepository := posrepo.NewRepository(database)
+	positionSelectionJob := posworker.NewSelectionJob(
+		cfg.Position.StaleAfter,
+		cfg.Position.ScanBatchSize,
+		cfg.Position.CheckInterval,
+		repository, positionQueue,
+		logger,
+		positionMetrics,
+	)
+	positionPusher, err := push.NewPushHTTPClient(cfg.Push.HTTPURL, cfg.Push.RequestTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("create HTTP client for push service: %w", err)
+	}
+	positionWorkerPool := posworker.NewWorkerPool(cfg.Position.Workers,
+		positionQueue,
+		positionPusher,
+		logger,
+		positionMetrics,
+	)
+
+	createPosService := createpos.NewService(positionRepository,
+		repository,
+		txManager,
+		positionQueue,
+		positionMetrics,
+	)
+
+	getPosService := getpos.NewService(positionRepository, repository)
+
 	createService := create.NewService(
 		txManager,
 		repository,
@@ -164,26 +204,6 @@ func New(
 		repository,
 		finish.WithObservability(logger, tripMetrics),
 	)
-
-	positionRepository := posrepo.NewRepository(database)
-
-	positionQueue := posworker.NewPriorityQueue(int(cfg.Position.QueueSize))
-
-	positionSelectionJob := posworker.NewSelectionJob(
-		cfg.Position.StaleAfter,
-		cfg.Position.ScanBatchSize,
-		cfg.Position.CheckInterval,
-		repository, positionQueue,
-		logger,
-	)
-	positionPusher, err := push.NewPushHTTPClient(cfg.Push.HTTPURL, cfg.Push.RequestTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("create HTTP client for push service: %w", err)
-	}
-	positionWorkerPool := posworker.NewWorkerPool(cfg.Position.Workers, positionQueue, positionPusher, logger)
-
-	createPosService := createpos.NewService(positionRepository, repository, txManager, positionQueue)
-	getPosService := getpos.NewService(positionRepository, repository)
 
 	httpHandler := httpapi.NewHandler(
 		createhttp.New(createService, logger),

@@ -17,7 +17,6 @@ type PositionMetrics struct {
 	positionSaved            metric.Int64Counter
 	rowsRead                 metric.Int64Histogram
 	activeWorkers            atomic.Int64
-	registration             metric.Registration
 }
 
 type StaleCheckResult string
@@ -38,7 +37,7 @@ const (
 
 func NewPositionsMetrics(
 	meter metric.Meter,
-	queueSize func() int64,
+	queueSize func() int,
 ) (*PositionMetrics, error) {
 	if meter == nil {
 		return nil, errors.New("meter must not be nil")
@@ -146,9 +145,9 @@ func NewPositionsMetrics(
 		rowsRead:                 rowsRead,
 	}
 
-	registration, err := meter.RegisterCallback(func(ctx context.Context, observer metric.Observer) error {
+	_, err = meter.RegisterCallback(func(ctx context.Context, observer metric.Observer) error {
 		observer.ObserveInt64(workersActive, positionMetrics.activeWorkers.Load())
-		observer.ObserveInt64(queueSize_, queueSize())
+		observer.ObserveInt64(queueSize_, int64(queueSize()))
 		return nil
 	},
 		workersActive,
@@ -157,7 +156,6 @@ func NewPositionsMetrics(
 	if err != nil {
 		return nil, err
 	}
-	positionMetrics.registration = registration
 
 	return positionMetrics, nil
 }
@@ -199,11 +197,4 @@ func (p *PositionMetrics) IncrementActiveWorkers() {
 
 func (p *PositionMetrics) DecrementActiveWorkers() {
 	p.activeWorkers.Add(-1)
-}
-
-func (p *PositionMetrics) Unregister() error {
-	if p.registration == nil {
-		return nil
-	}
-	return p.registration.Unregister()
 }

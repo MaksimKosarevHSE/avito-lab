@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
 	"github.com/google/uuid"
 )
 
@@ -29,4 +30,15 @@ type TripBatchSelector interface {
 		positionScanBatchSize int32,
 		ptr *FetchForPushPtr, // optional
 	) (FetchForPushResult, error)
+}
+
+type JobPositionMetrics interface {
+	AddStaleCheckResult(ctx context.Context, result position.StaleCheckResult)
+	RecordRowsRead(ctx context.Context, cnt int64)
+}
+
+type WorkerPositionMetrics interface {
+	IncrementActiveWorkers()
+	DecrementActiveWorkers()
+	AddPositionRequestResult(ctx context.Context, result position.PositionRequestResult, duration time.Duration)
 }
