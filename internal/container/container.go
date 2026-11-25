@@ -51,8 +51,9 @@ type Container struct {
 
 	Logger *slog.Logger
 
-	pool      *pgxpool.Pool
-	telemetry *telemetry.Providers
+	pool           *pgxpool.Pool
+	pushHTTPClient *push.PushHTTPClient
+	telemetry      *telemetry.Providers
 }
 
 func New(
@@ -169,6 +170,7 @@ func New(
 		cfg.Position.StaleAfter,
 		cfg.Position.ScanBatchSize,
 		cfg.Position.CheckInterval,
+		posworker.NewSystemClock(),
 		repository, positionQueue,
 		logger,
 		positionMetrics,
@@ -259,6 +261,7 @@ func New(
 		PushWorkerPool: positionWorkerPool,
 		Logger:         logger,
 		pool:           pool,
+		pushHTTPClient: positionPusher,
 		telemetry:      providers,
 	}, nil
 }
@@ -269,6 +272,7 @@ func (c *Container) Close(ctx context.Context) error {
 	}
 
 	var result error
+	c.pushHTTPClient.CloseIdleConnections()
 	if c.pool != nil {
 		result = errors.Join(result, postgres.Close(ctx, c.pool))
 	}

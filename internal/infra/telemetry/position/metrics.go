@@ -12,7 +12,7 @@ import (
 
 type PositionMetrics struct {
 	staleChecks              metric.Int64Counter // queued duplicate dropped
-	positionRequests         metric.Int64Counter // success error dropped cancelled
+	positionRequests         metric.Int64Counter // success error dropped
 	positionRequestsDuration metric.Float64Histogram
 	positionSaved            metric.Int64Counter
 	rowsRead                 metric.Int64Histogram
@@ -30,10 +30,9 @@ const (
 type PositionRequestResult string
 
 const (
-	PositionRequestResultSuccess   PositionRequestResult = "success"
-	PositionRequestResultError     PositionRequestResult = "error"
-	PositionRequestResultDropped   PositionRequestResult = "dropped"
-	PositionRequestResultCancelled PositionRequestResult = "cancelled"
+	PositionRequestResultSuccess PositionRequestResult = "success"
+	PositionRequestResultError   PositionRequestResult = "error"
+	PositionRequestResultDropped PositionRequestResult = "dropped"
 )
 
 func NewPositionsMetrics(
@@ -172,7 +171,7 @@ func (p *PositionMetrics) AddPositionRequestResult(ctx context.Context, result P
 		attribute.String("result", string(result)),
 	))
 
-	if result == PositionRequestResultCancelled || result == PositionRequestResultDropped {
+	if result == PositionRequestResultDropped {
 		return
 	}
 

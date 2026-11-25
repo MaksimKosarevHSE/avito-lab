@@ -9,7 +9,6 @@ import (
 
 	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/position"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	posmetrics "github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
 )
 
 type Service struct {
@@ -90,8 +89,6 @@ func (s *Service) Create(ctx context.Context, input Input) (position.Position, e
 		return position.Position{}, fmt.Errorf("create position transaction: %w", err)
 	}
 	s.positionMetrics.AddPositionSaved(ctx)
-	if ok := s.positionPushCanceller.Cancel(value.TripID); ok {
-		s.positionMetrics.AddPositionRequestResult(ctx, posmetrics.PositionRequestResultCancelled, 0)
-	}
+	s.positionPushCanceller.Cancel(value.TripID)
 	return createResult, nil
 }

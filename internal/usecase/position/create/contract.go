@@ -8,7 +8,6 @@ import (
 
 	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/position"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
-	posmetrics "github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
 )
 
 type positionRepository interface {
@@ -30,5 +29,4 @@ type positionPushCanceller interface {
 
 type positionSaveMetrics interface {
 	AddPositionSaved(ctx context.Context)
-	AddPositionRequestResult(ctx context.Context, result posmetrics.PositionRequestResult, duration time.Duration)
 }

@@ -21,6 +21,7 @@ type SelectionJob struct {
 	positionCheckInterval time.Duration
 	positionScanBatchSize int32
 
+	clock             Clock
 	tripBatchSelector TripBatchSelector
 	tripEnqueuer      TripEnqueuer
 	logger            *slog.Logger
@@ -32,6 +33,7 @@ func NewSelectionJob(
 	positionStaleAfter time.Duration,
 	positionScanBatchSize int32,
 	positionCheckInterval time.Duration,
+	clock Clock,
 	tripBatchSelector TripBatchSelector,
 	tripEnqueuer TripEnqueuer,
 	logger *slog.Logger,
@@ -42,6 +44,7 @@ func NewSelectionJob(
 		positionStaleAfter:    positionStaleAfter,
 		positionScanBatchSize: positionScanBatchSize,
 		positionCheckInterval: positionCheckInterval,
+		clock:                 clock,
 		tripEnqueuer:          tripEnqueuer,
 		tripBatchSelector:     tripBatchSelector,
 		logger:                logger.With("component", "position-selection"),
@@ -54,14 +57,14 @@ func (j *SelectionJob) Run(ctx context.Context) {
 	j.logger.InfoContext(ctx, "component started")
 	defer j.logger.InfoContext(context.WithoutCancel(ctx), "component stopped")
 
-	ticker := time.NewTicker(j.positionCheckInterval)
+	ticker := j.clock.NewTicker(j.positionCheckInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
+		case <-ticker.C():
 			j.fetchForPushQuery(ctx)
 		}
 	}

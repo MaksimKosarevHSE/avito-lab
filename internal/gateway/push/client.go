@@ -20,16 +20,18 @@ var (
 )
 
 type PushHTTPClient struct {
-	client pushapi.ClientWithResponsesInterface
+	client    pushapi.ClientWithResponsesInterface
+	transport *http.Transport
 }
 
 func NewPushHTTPClient(
 	httpURL string,
 	requestTimeout time.Duration,
 ) (*PushHTTPClient, error) {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
 	client := &http.Client{
 		Timeout:   requestTimeout,
-		Transport: otelhttp.NewTransport(http.DefaultTransport),
+		Transport: otelhttp.NewTransport(transport),
 	}
 	generatedClient, err := pushapi.NewClientWithResponses(
 		httpURL,
@@ -40,8 +42,13 @@ func NewPushHTTPClient(
 	}
 
 	return &PushHTTPClient{
-		client: generatedClient,
+		client:    generatedClient,
+		transport: transport,
 	}, nil
+}
+
+func (c *PushHTTPClient) CloseIdleConnections() {
+	c.transport.CloseIdleConnections()
 }
 
 func (c *PushHTTPClient) PushPosition(ctx context.Context, tripID, driverID uuid.UUID) error {
