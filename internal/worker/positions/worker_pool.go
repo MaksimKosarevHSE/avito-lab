@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
 )
@@ -27,6 +30,7 @@ type WorkerPool struct {
 	positionPusher  PositionPusher
 	logger          *slog.Logger
 	positionMetrics WorkerPositionMetrics
+	tracer          trace.Tracer
 }
 
 func NewWorkerPool(workersCount int32,
@@ -34,6 +38,7 @@ func NewWorkerPool(workersCount int32,
 	positionPusher PositionPusher,
 	logger *slog.Logger,
 	workerPositionMetrics WorkerPositionMetrics,
+	tracer trace.Tracer,
 ) *WorkerPool {
 	return &WorkerPool{
 		workersCount:    workersCount,
@@ -41,6 +46,7 @@ func NewWorkerPool(workersCount int32,
 		positionPusher:  positionPusher,
 		logger:          logger.With("component", "position-worker-pool"),
 		positionMetrics: workerPositionMetrics,
+		tracer:          tracer,
 	}
 }
 
@@ -82,25 +88,43 @@ func (wp *WorkerPool) worker(ctx context.Context, _ int, wg *sync.WaitGroup) {
 		if ctx.Err() != nil {
 			return
 		}
-		wp.pushPosition(ctx, trip.TripID, trip.DriverID)
+		wp.pushPosition(ctx, trip)
 	}
 }
 
-func (wp *WorkerPool) pushPosition(ctx context.Context, tripID, driverID uuid.UUID) {
+func (wp *WorkerPool) pushPosition(ctx context.Context, trip SelectedTrip) {
+	spanOptions := []trace.SpanStartOption{
+		trace.WithNewRoot(),
+		trace.WithSpanKind(trace.SpanKindInternal),
+		trace.WithAttributes(
+			attribute.String("trip.id", trip.TripID.String()),
+			attribute.String("driver.id", trip.DriverID.String()),
+		),
+	}
+	if trip.CheckSpanContext.IsValid() {
+		spanOptions = append(spanOptions, trace.WithLinks(trace.Link{SpanContext: trip.CheckSpanContext}))
+	}
+
+	ctx, span := wp.tracer.Start(ctx, "positions.process_request", spanOptions...)
+	defer span.End()
+
 	wp.positionMetrics.IncrementActiveWorkers()
 	defer wp.positionMetrics.DecrementActiveWorkers()
-	defer wp.tripSupplier.Complete(tripID)
+	defer wp.tripSupplier.Complete(trip.TripID)
 
 	reqResult := position.PositionRequestResultSuccess
 
 	startedAt := time.Now()
-	err := wp.positionPusher.PushPosition(ctx, tripID, driverID)
+	err := wp.positionPusher.PushPosition(ctx, trip.TripID, trip.DriverID)
 	duration := time.Since(startedAt)
 
 	if err != nil {
 		reqResult = position.PositionRequestResultError
-		wp.logger.WarnContext(ctx, "push position failed", "trip_id", tripID, "error", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "push position failed")
+		wp.logger.WarnContext(ctx, "push position failed", "trip_id", trip.TripID, "error", err)
 	}
+	span.SetAttributes(attribute.String("tripgo.position_request.result", string(reqResult)))
 
 	wp.positionMetrics.AddPositionRequestResult(
 		ctx, reqResult,

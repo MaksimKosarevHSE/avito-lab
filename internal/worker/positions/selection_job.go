@@ -5,6 +5,10 @@ import (
 	"log/slog"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
 )
 
@@ -21,6 +25,7 @@ type SelectionJob struct {
 	tripEnqueuer      TripEnqueuer
 	logger            *slog.Logger
 	positionMetrics   JobPositionMetrics
+	tracer            trace.Tracer
 }
 
 func NewSelectionJob(
@@ -31,6 +36,7 @@ func NewSelectionJob(
 	tripEnqueuer TripEnqueuer,
 	logger *slog.Logger,
 	positionMetrics JobPositionMetrics,
+	tracer trace.Tracer,
 ) *SelectionJob {
 	return &SelectionJob{
 		positionStaleAfter:    positionStaleAfter,
@@ -40,6 +46,7 @@ func NewSelectionJob(
 		tripBatchSelector:     tripBatchSelector,
 		logger:                logger.With("component", "position-selection"),
 		positionMetrics:       positionMetrics,
+		tracer:                tracer,
 	}
 }
 
@@ -61,8 +68,16 @@ func (j *SelectionJob) Run(ctx context.Context) {
 }
 
 func (j *SelectionJob) fetchForPushQuery(ctx context.Context) {
+	ctx, span := j.tracer.Start(
+		ctx,
+		"positions.stale_check",
+		trace.WithSpanKind(trace.SpanKindInternal),
+	)
+	defer span.End()
+
 	rowsReadCnt := 0
 	defer func() {
+		span.SetAttributes(attribute.Int("tripgo.stale_checks.rows_read", rowsReadCnt))
 		j.positionMetrics.RecordRowsRead(ctx, int64(rowsReadCnt))
 	}()
 
@@ -77,6 +92,8 @@ func (j *SelectionJob) fetchForPushQuery(ctx context.Context) {
 			nextPtr,
 		)
 		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "fetch stale trips failed")
 			if ctx.Err() == nil {
 				j.logger.ErrorContext(ctx, "fetch for push query", "error", err)
 			}
@@ -86,6 +103,7 @@ func (j *SelectionJob) fetchForPushQuery(ctx context.Context) {
 		rowsReadCnt += len(result.SelectedTrips)
 
 		for _, trip := range result.SelectedTrips {
+			trip.CheckSpanContext = span.SpanContext()
 			enqueueResult := j.tripEnqueuer.Enqueue(trip)
 			switch enqueueResult.Status {
 			case PushStatusClosed:
@@ -95,6 +113,11 @@ func (j *SelectionJob) fetchForPushQuery(ctx context.Context) {
 					ctx,
 					"position request dropped because queue is full",
 					"trip_id", trip.TripID,
+				)
+				j.positionMetrics.AddPositionRequestResult(
+					ctx,
+					position.PositionRequestResultDropped,
+					0,
 				)
 				stopped = true
 			}
@@ -107,6 +130,11 @@ func (j *SelectionJob) fetchForPushQuery(ctx context.Context) {
 					"replacement_trip_id", trip.TripID,
 				)
 				j.positionMetrics.AddStaleCheckResult(ctx, position.StaleCheckResultDropped)
+				j.positionMetrics.AddPositionRequestResult(
+					ctx,
+					position.PositionRequestResultDropped,
+					0,
+				)
 			}
 
 			if staleCheckResult, ok := toStaleCheckResult(enqueueResult.Status); ok {

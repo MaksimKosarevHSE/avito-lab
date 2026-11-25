@@ -4,14 +4,17 @@ import (
 	"context"
 	"time"
 
-	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/trace"
+
+	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
 )
 
 type SelectedTrip struct {
-	TripID        uuid.UUID
-	DriverID      uuid.UUID
-	LastTrackedAt time.Time
+	TripID           uuid.UUID
+	DriverID         uuid.UUID
+	LastTrackedAt    time.Time
+	CheckSpanContext trace.SpanContext
 }
 type FetchForPushPtr struct {
 	LastTrackedAt time.Time
@@ -34,6 +37,7 @@ type TripBatchSelector interface {
 
 type JobPositionMetrics interface {
 	AddStaleCheckResult(ctx context.Context, result position.StaleCheckResult)
+	AddPositionRequestResult(ctx context.Context, result position.PositionRequestResult, duration time.Duration)
 	RecordRowsRead(ctx context.Context, cnt int64)
 }
 

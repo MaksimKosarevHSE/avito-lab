@@ -154,6 +154,7 @@ func New(
 	}
 
 	positionQueue := posworker.NewPriorityQueue(int(cfg.Position.QueueSize))
+	positionTracer := providers.Traces.Tracer(serviceName + "/positions")
 
 	positionMetrics, err := posmetrics.NewPositionsMetrics(
 		providers.Metrics.Meter(serviceName+"/position"),
@@ -171,6 +172,7 @@ func New(
 		repository, positionQueue,
 		logger,
 		positionMetrics,
+		positionTracer,
 	)
 	positionPusher, err := push.NewPushHTTPClient(cfg.Push.HTTPURL, cfg.Push.RequestTimeout)
 	if err != nil {
@@ -181,6 +183,7 @@ func New(
 		positionPusher,
 		logger,
 		positionMetrics,
+		positionTracer,
 	)
 
 	createPosService := createpos.NewService(positionRepository,

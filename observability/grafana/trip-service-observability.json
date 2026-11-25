@@ -202,7 +202,7 @@
   {
     "id": 5,
     "title": "Position request rate by result",
-    "description": "Worker outcomes per second, including requests cancelled when a fresh coordinate arrives.",
+    "description": "Position request outcomes per second. Dropped means a task could not be kept in the full queue; cancelled means a fresh coordinate removed it.",
     "type": "timeseries",
     "datasource": {"type": "prometheus", "uid": "prometheus"},
     "gridPos": {"h": 8, "w": 12, "x": 0, "y": 15},
@@ -239,14 +239,14 @@
   {
     "id": 6,
     "title": "Position request results — selected range",
-    "description": "Worker outcomes accumulated only during the time range selected in the dashboard.",
+    "description": "Position request outcomes accumulated only during the selected range, including dropped and cancelled tasks.",
     "type": "bargauge",
     "datasource": {"type": "prometheus", "uid": "prometheus"},
     "gridPos": {"h": 8, "w": 12, "x": 12, "y": 15},
     "targets": [
       {
         "refId": "A",
-        "expr": "(round(sum by (result) (increase(tripgo_position_requests_total{job=\"otel-collector\", exported_job=\"tripgo/trip-service\"}[$__range])))) or label_replace(vector(0), \"result\", \"success\", \"\", \".*\") or label_replace(vector(0), \"result\", \"error\", \"\", \".*\") or label_replace(vector(0), \"result\", \"cancelled\", \"\", \".*\")",
+        "expr": "(round(sum by (result) (increase(tripgo_position_requests_total{job=\"otel-collector\", exported_job=\"tripgo/trip-service\"}[$__range])))) or label_replace(vector(0), \"result\", \"success\", \"\", \".*\") or label_replace(vector(0), \"result\", \"error\", \"\", \".*\") or label_replace(vector(0), \"result\", \"dropped\", \"\", \".*\") or label_replace(vector(0), \"result\", \"cancelled\", \"\", \".*\")",
         "legendFormat": "{{result}}",
         "instant": true,
         "range": false
