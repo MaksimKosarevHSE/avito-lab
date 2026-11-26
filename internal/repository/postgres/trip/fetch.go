@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 
 	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/worker/positions"
 )
 
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (domaintrip.Trip, error) {
@@ -53,4 +55,73 @@ func (r *Repository) getByID(
 	}
 
 	return result, nil
+}
+
+const fetchForPushQuery = `
+SELECT id, driver_id, COALESCE(last_position_at, started_at) as last_tracked_at
+FROM trips WHERE trips.status = 'active'
+AND COALESCE(last_position_at, started_at) < NOW() - ($1::bigint * INTERVAL '1 microsecond')
+AND ($2::timestamptz IS NULL OR ((COALESCE(last_position_at, started_at), id) > ($2::timestamptz, $3::uuid)))
+ORDER BY COALESCE(last_position_at, started_at) ASC, id ASC
+LIMIT $4
+`
+
+func (r *Repository) FetchForPushQuery(
+	ctx context.Context,
+	positionStaleAfter time.Duration,
+	positionScanBatchSize int32,
+	ptr *positions.FetchForPushPtr, // optional
+) (positions.FetchForPushResult, error) {
+	var ptrTime any
+	var ptrID any
+	if ptr != nil {
+		ptrTime = ptr.LastTrackedAt
+		ptrID = ptr.TripID
+	}
+
+	result := make([]positions.SelectedTrip, 0)
+	err := r.db.Execute(ctx, func(queryCtx context.Context, executor postgres.Executor) error {
+		rows, err := executor.Query(
+			queryCtx,
+			fetchForPushQuery,
+			positionStaleAfter.Microseconds(),
+			ptrTime,
+			ptrID,
+			positionScanBatchSize,
+		)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			row, err := ScanTripForPush(rows)
+			if err != nil {
+				return err
+			}
+
+			result = append(result, row)
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return positions.FetchForPushResult{}, err
+	}
+
+	var nextPtr *positions.FetchForPushPtr = nil
+	if len(result) > 0 {
+		last := result[len(result)-1]
+		nextPtr = &positions.FetchForPushPtr{
+			LastTrackedAt: last.LastTrackedAt,
+			TripID:        last.TripID,
+		}
+	}
+
+	return positions.FetchForPushResult{
+		SelectedTrips: result,
+		NextPtr:       nextPtr,
+	}, nil
 }

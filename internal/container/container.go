@@ -14,9 +14,12 @@ import (
 
 	"github.com/MaksimKosarevHSE/avito-lab/api"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/config"
+	push "github.com/MaksimKosarevHSE/avito-lab/internal/gateway/push"
 	httpapi "github.com/MaksimKosarevHSE/avito-lab/internal/http"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/http/domainerror"
 	httpmiddleware "github.com/MaksimKosarevHSE/avito-lab/internal/http/middleware"
+	createposhttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/position/create"
+	getposhttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/position/get"
 	createhttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/create"
 	finishhttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/finish"
 	gethttp "github.com/MaksimKosarevHSE/avito-lab/internal/http/trip/get"
@@ -24,10 +27,15 @@ import (
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/postgres/transaction"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry"
+	posmetrics "github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
+	posrepo "github.com/MaksimKosarevHSE/avito-lab/internal/repository/postgres/position"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/repository/postgres/trip"
+	createpos "github.com/MaksimKosarevHSE/avito-lab/internal/usecase/position/create"
+	getpos "github.com/MaksimKosarevHSE/avito-lab/internal/usecase/position/get"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/create"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/finish"
 	"github.com/MaksimKosarevHSE/avito-lab/internal/usecase/trip/get"
+	posworker "github.com/MaksimKosarevHSE/avito-lab/internal/worker/positions"
 )
 
 const (
@@ -36,12 +44,16 @@ const (
 )
 
 type Container struct {
-	HTTPServer *http.Server
-	CleanupJob *idempotency.CleanupJob
-	Logger     *slog.Logger
+	HTTPServer       *http.Server
+	CleanupJob       *idempotency.CleanupJob
+	TripSelectionJob *posworker.SelectionJob
+	PushWorkerPool   *posworker.WorkerPool
 
-	pool      *pgxpool.Pool
-	telemetry *telemetry.Providers
+	Logger *slog.Logger
+
+	pool           *pgxpool.Pool
+	pushHTTPClient *push.PushHTTPClient
+	telemetry      *telemetry.Providers
 }
 
 func New(
@@ -142,6 +154,49 @@ func New(
 		return nil, fmt.Errorf("create HTTP metrics: %w", err)
 	}
 
+	positionQueue := posworker.NewPriorityQueue(int(cfg.Position.QueueSize))
+	positionTracer := providers.Traces.Tracer(serviceName + "/positions")
+
+	positionMetrics, err := posmetrics.NewPositionsMetrics(
+		providers.Metrics.Meter(serviceName+"/position"),
+		positionQueue.Len,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create position metrics: %w", err)
+	}
+
+	positionRepository := posrepo.NewRepository(database)
+	positionSelectionJob := posworker.NewSelectionJob(
+		cfg.Position.StaleAfter,
+		cfg.Position.ScanBatchSize,
+		cfg.Position.CheckInterval,
+		posworker.NewSystemClock(),
+		repository, positionQueue,
+		logger,
+		positionMetrics,
+		positionTracer,
+	)
+	positionPusher, err := push.NewPushHTTPClient(cfg.Push.HTTPURL, cfg.Push.RequestTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("create HTTP client for push service: %w", err)
+	}
+	positionWorkerPool := posworker.NewWorkerPool(cfg.Position.Workers,
+		positionQueue,
+		positionPusher,
+		logger,
+		positionMetrics,
+		positionTracer,
+	)
+
+	createPosService := createpos.NewService(positionRepository,
+		repository,
+		txManager,
+		positionQueue,
+		positionMetrics,
+	)
+
+	getPosService := getpos.NewService(positionRepository, repository)
+
 	createService := create.NewService(
 		txManager,
 		repository,
@@ -154,10 +209,13 @@ func New(
 		repository,
 		finish.WithObservability(logger, tripMetrics),
 	)
+
 	httpHandler := httpapi.NewHandler(
 		createhttp.New(createService, logger),
 		gethttp.New(getService, logger),
 		finishhttp.New(finishService, logger),
+		getposhttp.New(getPosService, logger),
+		createposhttp.New(createPosService, logger),
 		pool,
 		cfg.Database.QueryTimeout,
 		logger,
@@ -196,11 +254,15 @@ func New(
 	created = true
 
 	return &Container{
-		HTTPServer: server,
-		CleanupJob: cleanupJob,
-		Logger:     logger,
-		pool:       pool,
-		telemetry:  providers,
+		HTTPServer:       server,
+		CleanupJob:       cleanupJob,
+		TripSelectionJob: positionSelectionJob,
+
+		PushWorkerPool: positionWorkerPool,
+		Logger:         logger,
+		pool:           pool,
+		pushHTTPClient: positionPusher,
+		telemetry:      providers,
 	}, nil
 }
 
@@ -210,6 +272,7 @@ func (c *Container) Close(ctx context.Context) error {
 	}
 
 	var result error
+	c.pushHTTPClient.CloseIdleConnections()
 	if c.pool != nil {
 		result = errors.Join(result, postgres.Close(ctx, c.pool))
 	}

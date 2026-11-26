@@ -2,6 +2,8 @@ package trip
 
 import (
 	sq "github.com/Masterminds/squirrel"
+
+	"github.com/MaksimKosarevHSE/avito-lab/internal/worker/positions"
 )
 
 type Repository struct {
@@ -15,3 +17,5 @@ func New(db database) *Repository {
 		builder: sq.StatementBuilder.PlaceholderFormat(sq.Dollar),
 	}
 }
+
+var _ positions.TripBatchSelector = (*Repository)(nil)

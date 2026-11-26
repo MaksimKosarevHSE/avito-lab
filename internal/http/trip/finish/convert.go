@@ -22,6 +22,6 @@ func toAPITrip(value domaintrip.Trip) api.Trip {
 		Status:         api.TripStatus(value.Status),
 		StartedAt:      value.StartedAt,
 		FinishedAt:     value.FinishedAt,
-		LastPositionAt: nil,
+		LastPositionAt: value.LastPositionAt,
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/MaksimKosarevHSE/avito-lab/api"
+	"github.com/MaksimKosarevHSE/avito-lab/internal/domain/position"
 	domaintrip "github.com/MaksimKosarevHSE/avito-lab/internal/domain/trip"
 )
 
@@ -36,7 +37,7 @@ func Problem(err error) (int, api.Problem) {
 	}
 
 	switch {
-	case errors.Is(err, domaintrip.ErrInvalidTrip):
+	case errors.Is(err, domaintrip.ErrInvalidTrip), errors.Is(err, position.ErrInvalidPosition):
 		return newProblem(
 			http.StatusBadRequest,
 			"invalid-request",
