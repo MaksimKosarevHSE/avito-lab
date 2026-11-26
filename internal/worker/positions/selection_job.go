@@ -8,8 +8,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
-
-	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
 )
 
 type TripEnqueuer interface {
@@ -119,7 +117,7 @@ func (j *SelectionJob) fetchForPushQuery(ctx context.Context) {
 				)
 				j.positionMetrics.AddPositionRequestResult(
 					ctx,
-					position.PositionRequestResultDropped,
+					PositionRequestResultDropped,
 					0,
 				)
 				stopped = true
@@ -132,10 +130,10 @@ func (j *SelectionJob) fetchForPushQuery(ctx context.Context) {
 					"trip_id", enqueueResult.Removed.TripID,
 					"replacement_trip_id", trip.TripID,
 				)
-				j.positionMetrics.AddStaleCheckResult(ctx, position.StaleCheckResultDropped)
+				j.positionMetrics.AddStaleCheckResult(ctx, StaleCheckResultDropped)
 				j.positionMetrics.AddPositionRequestResult(
 					ctx,
-					position.PositionRequestResultDropped,
+					PositionRequestResultDropped,
 					0,
 				)
 			}
@@ -156,14 +154,14 @@ func (j *SelectionJob) fetchForPushQuery(ctx context.Context) {
 	}
 }
 
-func toStaleCheckResult(status EnqueueStatus) (position.StaleCheckResult, bool) {
+func toStaleCheckResult(status EnqueueStatus) (StaleCheckResult, bool) {
 	switch status {
 	case PushStatusQueued:
-		return position.StaleCheckResultQueued, true
+		return StaleCheckResultQueued, true
 	case PushStatusDuplicate:
-		return position.StaleCheckResultDuplicate, true
+		return StaleCheckResultDuplicate, true
 	case PushStatusDropped:
-		return position.StaleCheckResultDropped, true
+		return StaleCheckResultDropped, true
 	default:
 		return "", false
 	}

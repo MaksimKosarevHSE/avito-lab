@@ -125,8 +125,6 @@ func run() error {
 			shutdownErr,
 			fmt.Errorf("stop push workers: %w", shutdownCtx.Err()),
 		)
-		cancelWorkers()
-		<-workerDone
 	}
 	cancelWorkers()
 

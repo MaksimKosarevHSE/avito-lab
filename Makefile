@@ -19,10 +19,8 @@ export POSITION_WORKERS POSITION_QUEUE_SIZE PUSH_HTTP_URL PUSH_REQUEST_TIMEOUT
 export OTEL_SERVICE_NAME OTEL_EXPORTER_OTLP_ENDPOINT
 export OTEL_EXPORTER_OTLP_PROTOCOL OTEL_RESOURCE_ATTRIBUTES
 export OTEL_TRACES_SAMPLER OTEL_METRIC_EXPORT_INTERVAL
-export OTEL_METRIC_EXPORT_INTERVAL
-export POSITION_SCAN_BATCH_SIZE
 
-.PHONY: generate migrate migrate-down migrate-status run lint test test-integration
+.PHONY: generate migrate migrate-down migrate-status run lint test test-unit test-integration
 
 generate:
 	go generate ./internal/usecase/trip/... ./internal/http/trip/...
@@ -50,8 +48,10 @@ run:
 lint:
 	go tool golangci-lint run ./...
 
-test:
+test: test-unit test-integration
+
+test-unit:
 	go test -race -count=2 -cover ./...
 
 test-integration:
-	go test -race -count=1 -tags=integration -p=2 -timeout=5m ./...
+	go test -race -count=2 -tags=integration -p=2 -timeout=5m ./...

@@ -8,6 +8,8 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+
+	"github.com/MaksimKosarevHSE/avito-lab/internal/worker/positions"
 )
 
 type PositionMetrics struct {
@@ -18,22 +20,6 @@ type PositionMetrics struct {
 	rowsRead                 metric.Int64Histogram
 	activeWorkers            atomic.Int64
 }
-
-type StaleCheckResult string
-
-const (
-	StaleCheckResultQueued    StaleCheckResult = "queued"
-	StaleCheckResultDuplicate StaleCheckResult = "duplicate"
-	StaleCheckResultDropped   StaleCheckResult = "dropped"
-)
-
-type PositionRequestResult string
-
-const (
-	PositionRequestResultSuccess PositionRequestResult = "success"
-	PositionRequestResultError   PositionRequestResult = "error"
-	PositionRequestResultDropped PositionRequestResult = "dropped"
-)
 
 func NewPositionsMetrics(
 	meter metric.Meter,
@@ -160,18 +146,22 @@ func NewPositionsMetrics(
 	return positionMetrics, nil
 }
 
-func (p *PositionMetrics) AddStaleCheckResult(ctx context.Context, result StaleCheckResult) {
+func (p *PositionMetrics) AddStaleCheckResult(ctx context.Context, result positions.StaleCheckResult) {
 	p.staleChecks.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("result", string(result)),
 	))
 }
 
-func (p *PositionMetrics) AddPositionRequestResult(ctx context.Context, result PositionRequestResult, duration time.Duration) {
+func (p *PositionMetrics) AddPositionRequestResult(
+	ctx context.Context,
+	result positions.PositionRequestResult,
+	duration time.Duration,
+) {
 	p.positionRequests.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("result", string(result)),
 	))
 
-	if result == PositionRequestResultDropped {
+	if result == positions.PositionRequestResultDropped {
 		return
 	}
 

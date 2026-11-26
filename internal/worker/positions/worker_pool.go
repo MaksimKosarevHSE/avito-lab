@@ -10,8 +10,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
-
-	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
 )
 
 type TripSupplier interface {
@@ -112,14 +110,14 @@ func (wp *WorkerPool) pushPosition(ctx context.Context, trip SelectedTrip) {
 	defer wp.positionMetrics.DecrementActiveWorkers()
 	defer wp.tripSupplier.Complete(trip.TripID)
 
-	reqResult := position.PositionRequestResultSuccess
+	reqResult := PositionRequestResultSuccess
 
 	startedAt := time.Now()
 	err := wp.positionPusher.PushPosition(ctx, trip.TripID, trip.DriverID)
 	duration := time.Since(startedAt)
 
 	if err != nil {
-		reqResult = position.PositionRequestResultError
+		reqResult = PositionRequestResultError
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "push position failed")
 		wp.logger.WarnContext(ctx, "push position failed", "trip_id", trip.TripID, "error", err)

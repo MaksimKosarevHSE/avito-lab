@@ -6,8 +6,22 @@ import (
 
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel/trace"
+)
 
-	"github.com/MaksimKosarevHSE/avito-lab/internal/infra/telemetry/position"
+type StaleCheckResult string
+
+const (
+	StaleCheckResultQueued    StaleCheckResult = "queued"
+	StaleCheckResultDuplicate StaleCheckResult = "duplicate"
+	StaleCheckResultDropped   StaleCheckResult = "dropped"
+)
+
+type PositionRequestResult string
+
+const (
+	PositionRequestResultSuccess PositionRequestResult = "success"
+	PositionRequestResultError   PositionRequestResult = "error"
+	PositionRequestResultDropped PositionRequestResult = "dropped"
 )
 
 type SelectedTrip struct {
@@ -36,13 +50,13 @@ type TripBatchSelector interface {
 }
 
 type JobPositionMetrics interface {
-	AddStaleCheckResult(ctx context.Context, result position.StaleCheckResult)
-	AddPositionRequestResult(ctx context.Context, result position.PositionRequestResult, duration time.Duration)
+	AddStaleCheckResult(ctx context.Context, result StaleCheckResult)
+	AddPositionRequestResult(ctx context.Context, result PositionRequestResult, duration time.Duration)
 	RecordRowsRead(ctx context.Context, cnt int64)
 }
 
 type WorkerPositionMetrics interface {
 	IncrementActiveWorkers()
 	DecrementActiveWorkers()
-	AddPositionRequestResult(ctx context.Context, result position.PositionRequestResult, duration time.Duration)
+	AddPositionRequestResult(ctx context.Context, result PositionRequestResult, duration time.Duration)
 }
